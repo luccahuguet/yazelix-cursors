@@ -29,5 +29,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
       - run: nix flake check
+      - run: nix build .#yazelix_cursors --no-link
       - run: nix build .#yazelix_ghostty_cursors --no-link
       - run: nix run .#yzc -- --help

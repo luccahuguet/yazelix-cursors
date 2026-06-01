@@ -1,5 +1,5 @@
 {
-  description = "Standalone Ghostty cursor presets from Yazelix";
+  description = "Standalone Yazelix cursor presets and terminal shader outputs";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -36,7 +36,7 @@
             rustc = rustToolchain;
           };
           source = pkgs.lib.cleanSourceWith {
-            name = "yazelix-ghostty-cursors-source";
+            name = "yazelix-cursors-source";
             src = ./.;
             filter =
               path: _type:
@@ -50,7 +50,7 @@
           };
         in
         rustPlatform.buildRustPackage {
-          pname = "yazelix-ghostty-cursors";
+          pname = "yazelix-cursors";
           version = "0.1.0";
 
           src = source;
@@ -64,10 +64,11 @@
           postInstall = ''
             set -eu
 
-            share_dir="$out/share/yazelix/yazelix_ghostty_cursors"
-            legacy_share_dir="$out/share/yazelix/ghostty_cursor_shaders"
+            share_dir="$out/share/yazelix/yazelix_cursors"
+            legacy_share_dir="$out/share/yazelix/yazelix_ghostty_cursors"
+            legacy_shader_dir="$out/share/yazelix/ghostty_cursor_shaders"
             examples_dir="$share_dir/examples"
-            work="$TMPDIR/yazelix_ghostty_cursors_export"
+            work="$TMPDIR/yazelix_cursors_export"
             config_dir="$work/config"
 
             mkdir -p "$share_dir" "$examples_dir" "$config_dir"
@@ -89,9 +90,9 @@ custom-shader = $share_dir/shaders/generated_effects/tail.glsl
 EOF
 
             cat > "$share_dir/README.md" <<EOF
-# Yazelix Ghostty Cursors
+# Yazelix Cursors
 
-This package exports complete Ghostty cursor shader files generated from Yazelix cursor presets
+This package exports Yazelix cursor presets and complete Ghostty-compatible cursor shader files
 
 The package also includes the \`yzc\` CLI for standalone cursor config:
 
@@ -129,6 +130,7 @@ This package does not mutate your Ghostty config and does not include Yazelix ru
 EOF
 
             ln -s "$share_dir" "$legacy_share_dir"
+            ln -s "$share_dir" "$legacy_shader_dir"
 
             required_files="
               $share_dir/shaders/cursor_trail_blaze.glsl
@@ -147,8 +149,8 @@ EOF
           '';
 
           meta = {
-            description = "Standalone Ghostty cursor presets from Yazelix";
-            homepage = "https://github.com/luccahuguet/yazelix-ghostty-cursors";
+            description = "Standalone Yazelix cursor presets and terminal shader outputs";
+            homepage = "https://github.com/luccahuguet/yazelix-cursors";
             license = pkgs.lib.licenses.asl20;
             mainProgram = "yzc";
           };
@@ -164,7 +166,9 @@ EOF
         {
           default = yzc;
           yzc = yzc;
+          yazelix_cursors = yzc;
           yazelix_ghostty_cursors = yzc;
+          ghostty_cursor_shaders = yzc;
         }
       );
 
@@ -177,13 +181,22 @@ EOF
           type = "app";
           program = "${self.packages.${system}.yzc}/bin/yzc";
         };
+        yazelix_cursors = {
+          type = "app";
+          program = "${self.packages.${system}.yzc}/bin/yzc";
+        };
         yazelix_ghostty_cursors = {
+          type = "app";
+          program = "${self.packages.${system}.yzc}/bin/yzc";
+        };
+        ghostty_cursor_shaders = {
           type = "app";
           program = "${self.packages.${system}.yzc}/bin/yzc";
         };
       });
 
       checks = forAllSystems (system: {
+        yazelix_cursors = self.packages.${system}.yazelix_cursors;
         yzc = self.packages.${system}.yzc;
       });
     };

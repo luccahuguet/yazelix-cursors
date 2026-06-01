@@ -556,7 +556,7 @@ impl CursorColor {
 
 pub fn render_cursor_settings_jsonc(registry: &CursorRegistry) -> String {
     let mut out = String::new();
-    out.push_str("// Yazelix Ghostty Cursors settings\n");
+    out.push_str("// Yazelix Cursors settings\n");
     out.push_str("// Edit this file through `yzx config ui`, `yzc init`, or your editor.\n");
     out.push_str("// In Ghostty standalone setups, add: config-file = ~/.config/yazelix_ghostty_cursors/ghostty.conf\n");
     out.push_str("{\n");
@@ -1246,7 +1246,7 @@ pub fn write_ghostty_cursor_palette_shaders(
                     CursorError::io(
                         "read_curated_cursor_shader_variant",
                         "Could not read bundled Ghostty cursor shader variant",
-                        "Reinstall the yazelix_ghostty_cursors package and retry.",
+                        "Reinstall the yazelix_cursors package and retry.",
                         variant_path.to_string_lossy(),
                         source,
                     )
@@ -1282,7 +1282,7 @@ pub fn write_ghostty_cursor_effect_shaders(
             CursorErrorClass::Io,
             "missing_ghostty_effect_templates",
             "Could not find bundled Ghostty cursor effect templates.",
-            "Reinstall the yazelix_ghostty_cursors package so share/yazelix/yazelix_ghostty_cursors/shaders/upstream_effects exists.",
+            "Reinstall the yazelix_cursors package so share/yazelix/yazelix_cursors/shaders/upstream_effects exists.",
             json!({ "path": templates_dir.display().to_string() }),
         ));
     }
@@ -1315,7 +1315,7 @@ pub fn write_ghostty_cursor_effect_shaders(
             CursorError::io(
                 "read_ghostty_effect_template",
                 "Could not read bundled Ghostty cursor effect template",
-                "Reinstall the yazelix_ghostty_cursors package and retry.",
+                "Reinstall the yazelix_cursors package and retry.",
                 template_path.to_string_lossy(),
                 source,
             )
