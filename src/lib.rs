@@ -20,7 +20,6 @@ const SUPPORTED_TRAIL_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
 const SUPPORTED_MODE_EFFECTS: &[&str] =
     &["ripple", "sonic_boom", "rectangle_boom", "ripple_rectangle"];
 const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
-const SUPPORTED_CURATED_TEMPLATES: &[&str] = &["neon"];
 const REMOVED_CURSOR_NAMES: &[&str] = &["party"];
 const GHOSTTY_CURSOR_EFFECT_TEMPLATES: &[(&str, &str)] = &[
     ("tail", "cursor_tail.glsl"),
@@ -311,7 +310,6 @@ pub struct CursorDefinition {
     pub colors: Vec<CursorColor>,
     pub divider: Option<SplitDivider>,
     pub transition: Option<SplitTransition>,
-    pub template: Option<String>,
     pub cursor_color: CursorColor,
 }
 
@@ -320,7 +318,6 @@ pub struct CursorDefinition {
 pub enum CursorFamily {
     Mono,
     Split,
-    CuratedTemplate,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -545,15 +542,7 @@ impl CursorRegistry {
 
 impl CursorDefinition {
     pub fn shader_path(&self) -> String {
-        match self.family {
-            CursorFamily::CuratedTemplate => format!(
-                "./shaders/cursor_trail_{}.glsl",
-                self.template.as_deref().unwrap_or(&self.name)
-            ),
-            CursorFamily::Mono | CursorFamily::Split => {
-                format!("./shaders/cursor_trail_{}.glsl", self.name)
-            }
-        }
+        format!("./shaders/cursor_trail_{}.glsl", self.name)
     }
 
     pub fn cursor_color_hex(&self) -> &str {
@@ -590,7 +579,6 @@ impl CursorFamily {
         match self {
             CursorFamily::Mono => "mono",
             CursorFamily::Split => "split",
-            CursorFamily::CuratedTemplate => "curated_template",
         }
     }
 }
@@ -727,12 +715,6 @@ fn render_cursor_definition_jsonc(definition: &CursorDefinition, comma: &str) ->
             out.push_str(&format!("        \"{}\"\n", definition.colors[1].hex));
             out.push_str("      ],\n");
         }
-        CursorFamily::CuratedTemplate => {
-            out.push_str(&format!(
-                "      \"template\": \"{}\",\n",
-                definition.template.as_deref().unwrap_or("neon")
-            ));
-        }
     }
     out.push_str(&format!(
         "      \"cursor_color\": \"{}\"\n",
@@ -810,13 +792,12 @@ fn validate_definition(
     let family = match raw.family.trim() {
         "mono" => CursorFamily::Mono,
         "split" => CursorFamily::Split,
-        "curated_template" => CursorFamily::CuratedTemplate,
         other => {
             return Err(invalid_cursor_config(
                 path,
                 "cursor.family",
                 format!(
-                    "Cursor '{name}' uses unsupported family '{other}'. Expected mono, split, or curated_template."
+                    "Cursor '{name}' uses unsupported family '{other}'. Expected mono or split."
                 ),
             ));
         }
@@ -879,7 +860,6 @@ fn validate_definition(
                 colors: vec![base_color, accent_color],
                 divider: None,
                 transition: None,
-                template: None,
                 cursor_color,
             })
         }
@@ -935,98 +915,10 @@ fn validate_definition(
                 colors,
                 divider: Some(divider),
                 transition: Some(transition),
-                template: None,
                 cursor_color,
             })
         }
-        CursorFamily::CuratedTemplate => {
-            validate_curated_template_definition(path, name, family, raw)
-        }
     }
-}
-
-fn validate_curated_template_definition(
-    path: &Path,
-    name: String,
-    family: CursorFamily,
-    raw: RawCursorDefinition,
-) -> Result<CursorDefinition, CursorError> {
-    if raw.color.is_some() {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.color",
-            format!("Cursor '{name}' uses curated_template and must not set color."),
-        ));
-    }
-    if raw.accent_color.is_some() {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.accent_color",
-            format!("Cursor '{name}' uses curated_template and must not set accent_color."),
-        ));
-    }
-    if !raw.colors.is_empty() {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.colors",
-            format!("Cursor '{name}' uses curated_template and must not define colors."),
-        ));
-    }
-    if raw.divider.is_some() {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.divider",
-            format!("Cursor '{name}' uses curated_template and must not set divider."),
-        ));
-    }
-    if raw.transition.is_some() {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.transition",
-            format!("Cursor '{name}' uses curated_template and must not set transition."),
-        ));
-    }
-
-    let template = raw
-        .template
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            invalid_cursor_config(
-                path,
-                "cursor.template",
-                format!("Cursor '{name}' uses curated_template and must set template."),
-            )
-        })?;
-    if !SUPPORTED_CURATED_TEMPLATES.contains(&template) {
-        return Err(invalid_cursor_config(
-            path,
-            "cursor.template",
-            format!(
-                "Cursor '{name}' uses unsupported curated template '{template}'. Expected neon."
-            ),
-        ));
-    }
-
-    let cursor_color = raw.cursor_color.as_deref().ok_or_else(|| {
-        invalid_cursor_config(
-            path,
-            "cursor.cursor_color",
-            format!("Cursor '{name}' uses curated_template and must set cursor_color."),
-        )
-    })?;
-    let cursor_color = validate_color(path, &format!("cursor.{name}.cursor_color"), cursor_color)?;
-
-    Ok(CursorDefinition {
-        name,
-        family,
-        colors: Vec::new(),
-        divider: None,
-        transition: None,
-        template: Some(template.to_ascii_lowercase()),
-        cursor_color,
-    })
 }
 
 fn validate_split_divider(
@@ -1296,54 +1188,22 @@ pub fn write_ghostty_cursor_palette_shaders(
     let glow_header = render_trail_glow_header(glow_level);
 
     for definition in definitions {
-        match definition.family {
-            CursorFamily::Mono | CursorFamily::Split => {
-                let output_path =
-                    shaders_dest.join(format!("cursor_trail_{}.glsl", definition.name));
-                let rendered = format!(
-                    "{}{}\n{}",
-                    glow_header,
-                    common,
-                    render_data_driven_cursor_variant(definition, trail_duration)
-                );
-                fs::write(&output_path, rendered).map_err(|source| {
-                    CursorError::io(
-                        "write_data_driven_cursor_shader",
-                        "Could not write generated Ghostty cursor shader",
-                        "Check permissions for the Yazelix state directory and retry.",
-                        output_path.to_string_lossy(),
-                        source,
-                    )
-                })?;
-            }
-            CursorFamily::CuratedTemplate => {
-                let template = definition.template.as_deref().unwrap_or(&definition.name);
-                let variant_path = shaders_dest
-                    .join("variants")
-                    .join(format!("{template}.glsl"));
-                let variant = fs::read_to_string(&variant_path).map_err(|source| {
-                    CursorError::io(
-                        "read_curated_cursor_shader_variant",
-                        "Could not read bundled Ghostty cursor shader variant",
-                        "Reinstall the yazelix_cursors package and retry.",
-                        variant_path.to_string_lossy(),
-                        source,
-                    )
-                })?;
-                let combined = format!("{glow_header}{common}\n{variant}");
-                let rendered = scale_glsl_float_constant(&combined, "DURATION", trail_duration);
-                let output_path = shaders_dest.join(format!("cursor_trail_{template}.glsl"));
-                fs::write(&output_path, rendered).map_err(|source| {
-                    CursorError::io(
-                        "write_curated_cursor_shader",
-                        "Could not write generated Ghostty cursor shader",
-                        "Check permissions for the Yazelix state directory and retry.",
-                        output_path.to_string_lossy(),
-                        source,
-                    )
-                })?;
-            }
-        }
+        let output_path = shaders_dest.join(format!("cursor_trail_{}.glsl", definition.name));
+        let rendered = format!(
+            "{}{}\n{}",
+            glow_header,
+            common,
+            render_data_driven_cursor_variant(definition, trail_duration)
+        );
+        fs::write(&output_path, rendered).map_err(|source| {
+            CursorError::io(
+                "write_data_driven_cursor_shader",
+                "Could not write generated Ghostty cursor shader",
+                "Check permissions for the Yazelix state directory and retry.",
+                output_path.to_string_lossy(),
+                source,
+            )
+        })?;
     }
 
     Ok(())
@@ -1486,7 +1346,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
 "#
             )
         }
-        CursorFamily::CuratedTemplate => String::new(),
     }
 }
 
@@ -1694,6 +1553,19 @@ mod tests {
     fn load_registry(path: &Path) -> Result<CursorRegistry, CursorError> {
         let raw = fs::read_to_string(path).unwrap();
         CursorRegistry::parse_str(path, &raw)
+    }
+
+    fn copy_packaged_shader_sources(destination: &Path) {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/ghostty/shaders");
+        fs::copy(
+            source.join("cursor_trail_common.glsl"),
+            destination.join("cursor_trail_common.glsl"),
+        )
+        .unwrap();
+    }
+
+    fn generated_cursor_shader_name(definition: &CursorDefinition) -> String {
+        format!("cursor_trail_{}.glsl", definition.name)
     }
 
     fn base_registry(extra: &str) -> String {
@@ -1907,7 +1779,7 @@ color = "#ffffff"
         let error = load_registry(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config");
-        assert!(format!("{error:?}").contains("Expected mono, split, or curated_template"));
+        assert!(format!("{error:?}").contains("Expected mono or split"));
     }
 
     // Regression: retired split field names must fail fast instead of silently taking compatibility paths.
@@ -1954,6 +1826,60 @@ colors = ["#ff1600", "#2a3340"]"##,
         assert!(generated.contains("const vec4 YAZELIX_CURSOR_COLOR_0"));
     }
 
+    // Regression: Rio-aware idle/motion tuning must be generated for every preset, not only the preset used during manual testing.
+    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
+    #[test]
+    fn palette_shader_generation_applies_rio_tuning_to_every_default_preset() {
+        let (_temp, path) = write_registry(include_str!("../yazelix_ghostty_cursors_default.toml"));
+        let registry = load_registry(&path).unwrap();
+        let shader_dir = tempdir().unwrap();
+        copy_packaged_shader_sources(shader_dir.path());
+
+        write_ghostty_cursor_palette_shaders(shader_dir.path(), &registry, "medium", 1.0).unwrap();
+
+        for cursor_name in &registry.enabled_cursors {
+            let definition = registry.definitions.get(cursor_name).unwrap();
+            let shader_path = shader_dir
+                .path()
+                .join(generated_cursor_shader_name(definition));
+            let generated = fs::read_to_string(&shader_path).unwrap();
+            assert!(
+                generated.contains("return mix(0.035, mix(0.018, 0.300, motion), active);"),
+                "{} missing shared movement-spread policy",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains("return mix(1.0, mix(0.0, 1.75, motion), active);"),
+                "{} missing idle trail-glow clamp",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains("return max(yazelixRioTrailAnimatingFactor(), stretch);"),
+                "{} must not widen idle glow from a time-based recent-move boost",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains("return mix(0.004, mix(0.001, 0.022, motion), active);"),
+                "{} missing tight idle cursor-glow width policy",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains("return mix(1.0, mix(0.0, 1.55, motion), active);"),
+                "{} missing idle cursor-glow clamp",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains(
+                    "float cursorGlowWidth = yazelixRioCursorGlowWidth(rioTrailMotion, rioTrailActive);"
+                ),
+                "{} missing shared cursor glow width policy",
+                shader_path.display()
+            );
+        }
+
+        assert!(!shader_dir.path().join("cursor_trail_neon.glsl").exists());
+    }
+
     // Defends: the shipped default registry parses as the active product cursor surface.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
@@ -1963,7 +1889,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         let registry = load_registry(&path).unwrap();
 
         assert!(registry.enabled_cursors.contains(&"blaze".to_string()));
-        assert!(registry.enabled_cursors.contains(&"neon".to_string()));
+        assert!(!registry.enabled_cursors.contains(&"neon".to_string()));
         assert!(registry.enabled_cursors.contains(&"magma".to_string()));
         assert!(!registry.enabled_cursors.contains(&"inferno".to_string()));
         assert!(

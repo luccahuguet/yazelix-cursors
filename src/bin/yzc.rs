@@ -560,15 +560,7 @@ fn absolute_shader_path(
 }
 
 fn cursor_shader_file_name(cursor: &CursorDefinition) -> String {
-    match cursor.family {
-        CursorFamily::CuratedTemplate => {
-            format!(
-                "cursor_trail_{}.glsl",
-                cursor.template.as_deref().unwrap_or(&cursor.name)
-            )
-        }
-        CursorFamily::Mono | CursorFamily::Split => format!("cursor_trail_{}.glsl", cursor.name),
-    }
+    format!("cursor_trail_{}.glsl", cursor.name)
 }
 
 fn replace_dir(src: &Path, dst: &Path) -> Result<(), CursorError> {
@@ -694,12 +686,6 @@ fn cursor_definition_summary(definition: &CursorDefinition) -> String {
                 definition.cursor_color.hex
             )
         }
-        CursorFamily::CuratedTemplate => format!(
-            "{}: curated_template template={} cursor={}",
-            definition.name,
-            definition.template.as_deref().unwrap_or("unknown"),
-            definition.cursor_color.hex
-        ),
     }
 }
 

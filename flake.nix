@@ -135,7 +135,7 @@ EOF
             required_files="
               $share_dir/shaders/cursor_trail_blaze.glsl
               $share_dir/shaders/cursor_trail_snow.glsl
-              $share_dir/shaders/cursor_trail_neon.glsl
+              $share_dir/shaders/cursor_trail_eclipse.glsl
               $share_dir/shaders/cursor_trail_magma.glsl
               $share_dir/shaders/generated_effects/tail.glsl
               $share_dir/shaders/generated_effects/ripple.glsl
@@ -161,6 +161,12 @@ EOF
               "rio"
               "ratty"
               "protocol_cursor_positions"
+            ];
+            requiredShaderFiles = [
+              "cursor_trail_common.glsl"
+              "cursor_trail_reef.glsl"
+              "upstream_effects/ripple_rectangle_cursor.glsl"
+              "generated_effects/tail.glsl"
             ];
             forbiddenShaderFiles = [
               "build_shaders.nu"
