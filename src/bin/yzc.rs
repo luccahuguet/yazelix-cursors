@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use yazelix_cursors::{
     CursorDefinition, CursorError, CursorErrorClass, CursorFamily, CursorRegistry,
     ResolvedCursorRegistryState, SplitDivider, cursor_target_contracts,
-    format_ghostty_trail_duration, parse_jsonc_value, render_cursor_settings_jsonc,
+    format_ghostty_trail_duration, load_cursor_settings_jsonc,
+    persist_migrated_cursor_settings_jsonc, render_cursor_settings_jsonc,
     write_ghostty_cursor_effect_shaders, write_ghostty_cursor_palette_shaders,
 };
 
@@ -421,17 +422,14 @@ fn default_config_dir() -> Result<PathBuf, CursorError> {
 }
 
 fn load_standalone_registry(path: &Path) -> Result<CursorRegistry, CursorError> {
-    let raw = fs::read_to_string(path).map_err(|source| {
-        CursorError::io(
-            "read_yzc_settings_jsonc",
-            "Could not read Yazelix cursor settings.jsonc",
-            "Run `yzc init`, or fix the settings path and retry.",
-            path.to_string_lossy(),
-            source,
-        )
-    })?;
-    let value = parse_jsonc_value(path, &raw)?;
-    CursorRegistry::parse_json_value(path, value)
+    let (registry, migration) = load_cursor_settings_jsonc(path)?;
+    if let Some(backup_path) = persist_migrated_cursor_settings_jsonc(path, &migration)? {
+        eprintln!(
+            "Migrated Yazelix cursor settings.jsonc; backup: {}",
+            backup_path.display()
+        );
+    }
+    Ok(registry)
 }
 
 fn resolve_share_dir(override_dir: Option<&Path>) -> Result<PathBuf, CursorError> {

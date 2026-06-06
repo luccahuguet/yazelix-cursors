@@ -20,6 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 toml = "0.9"
+yazelix_ratconfig = { package = "yazelix-ratconfig", git = "https://github.com/luccahuguet/yazelix-ratconfig", rev = "180994407b3c70d9c6cb6df5b03356ae59ecafd8", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

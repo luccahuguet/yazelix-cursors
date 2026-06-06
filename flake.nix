@@ -54,7 +54,12 @@
           version = "0.1.0";
 
           src = source;
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            outputHashes = {
+              "yazelix-ratconfig-0.1.0" = "sha256-H1BTLSH81nCq4dw4PDshxHvhcXbMR+Uv4o0632EXwK8=";
+            };
+          };
           cargoBuildFlags = [
             "--bin"
             "yzc"
