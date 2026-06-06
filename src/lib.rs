@@ -2244,12 +2244,12 @@ colors = ["#ff1600", "#2a3340"]"##,
                 .join(generated_cursor_shader_name(definition));
             let generated = fs::read_to_string(&shader_path).unwrap();
             assert!(
-                generated.contains("return mix(0.035, mix(0.012, 0.300, motion), active);"),
+                generated.contains("return mix(0.035, mix(0.018, 0.300, motion), active);"),
                 "{} missing shared movement-spread policy",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(1.0, mix(0.35, 1.75, motion), active);"),
+                generated.contains("return mix(1.0, mix(0.65, 1.75, motion), active);"),
                 "{} missing visible low idle trail-glow policy",
                 shader_path.display()
             );
@@ -2261,13 +2261,39 @@ colors = ["#ff1600", "#2a3340"]"##,
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(0.004, mix(0.004, 0.022, motion), active);"),
+                generated.contains("return mix(0.004, mix(0.003, 0.022, motion), active);"),
                 "{} missing visible idle cursor-glow width policy",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(1.0, mix(0.45, 1.55, motion), active);"),
+                generated.contains("return mix(1.0, mix(0.70, 1.55, motion), active);"),
                 "{} missing visible low idle cursor-glow policy",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains("float rioTrailAnimating = yazelixRioTrailAnimatingFactor();"),
+                "{} missing Rio animating gate",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains(
+                    "sdfTrail = mix(sdfTrail, yazelixRioTrailSdf(vu, offsetFactor), rioTrailAnimating);"
+                ),
+                "{} must only switch to Rio trail geometry while Rio is animating",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains(
+                    "fragColor = mix(trail, fragColor, mix(revealMix, 0.0, rioTrailAnimating));"
+                ),
+                "{} must reveal Rio trail geometry only while Rio is animating",
+                shader_path.display()
+            );
+            assert!(
+                generated.contains(
+                    "trail = mix(trail, saturate(base, trailSaturation), trailCoreMask(sdfCurrentCursor, 0.0));"
+                ),
+                "{} missing explicit split cursor fill overlay",
                 shader_path.display()
             );
             assert!(
