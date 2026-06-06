@@ -2244,28 +2244,30 @@ colors = ["#ff1600", "#2a3340"]"##,
                 .join(generated_cursor_shader_name(definition));
             let generated = fs::read_to_string(&shader_path).unwrap();
             assert!(
-                generated.contains("return mix(0.035, mix(0.018, 0.300, motion), active);"),
+                generated.contains("return mix(0.035, mix(0.012, 0.300, motion), active);"),
                 "{} missing shared movement-spread policy",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(1.0, mix(0.0, 1.75, motion), active);"),
-                "{} missing idle trail-glow clamp",
+                generated.contains("return mix(1.0, mix(0.35, 1.75, motion), active);"),
+                "{} missing visible low idle trail-glow policy",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return max(yazelixRioTrailAnimatingFactor(), stretch);"),
-                "{} must not widen idle glow from a time-based recent-move boost",
+                generated.contains(
+                    "return max(max(yazelixRioTrailAnimatingFactor(), stretch), recentMove * 0.80);"
+                ),
+                "{} missing short movement glow boost",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(0.004, mix(0.001, 0.022, motion), active);"),
-                "{} missing tight idle cursor-glow width policy",
+                generated.contains("return mix(0.004, mix(0.004, 0.022, motion), active);"),
+                "{} missing visible idle cursor-glow width policy",
                 shader_path.display()
             );
             assert!(
-                generated.contains("return mix(1.0, mix(0.0, 1.55, motion), active);"),
-                "{} missing idle cursor-glow clamp",
+                generated.contains("return mix(1.0, mix(0.45, 1.55, motion), active);"),
+                "{} missing visible low idle cursor-glow policy",
                 shader_path.display()
             );
             assert!(

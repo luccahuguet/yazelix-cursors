@@ -145,7 +145,8 @@ float yazelixRioTrailMotionFactor(vec4 currentCursor) {
     vec2 cursorSize = max(currentCursor.zw, vec2(0.0001));
     vec2 extraSize = max(animatedCursor.zw - currentCursor.zw, vec2(0.0));
     float stretch = clamp(length(extraSize / cursorSize) * 0.75, 0.0, 1.0);
-    return max(yazelixRioTrailAnimatingFactor(), stretch);
+    float recentMove = 1.0 - smoothstep(0.0, 0.08, max(iTime - iTimeCursorChange, 0.0));
+    return max(max(yazelixRioTrailAnimatingFactor(), stretch), recentMove * 0.80);
 #else
     return 0.0;
 #endif
@@ -208,11 +209,11 @@ float yazelixRioTrailSdf(in vec2 vu, in vec2 offsetFactor) {
 }
 
 float yazelixRioTrailGlowWidth(float motion, float active) {
-    return mix(0.035, mix(0.018, 0.300, motion), active);
+    return mix(0.035, mix(0.012, 0.300, motion), active);
 }
 
 float yazelixRioTrailGlowGain(float motion, float active) {
-    return mix(1.0, mix(0.0, 1.75, motion), active);
+    return mix(1.0, mix(0.35, 1.75, motion), active);
 }
 
 float yazelixRioTrailEdgeWidth(float motion, float active) {
@@ -224,11 +225,11 @@ float yazelixRioTrailSaturation(float fallback, float motion, float active) {
 }
 
 float yazelixRioCursorGlowWidth(float motion, float active) {
-    return mix(0.004, mix(0.001, 0.022, motion), active);
+    return mix(0.004, mix(0.004, 0.022, motion), active);
 }
 
 float yazelixRioCursorGlowGain(float motion, float active) {
-    return mix(1.0, mix(0.0, 1.55, motion), active);
+    return mix(1.0, mix(0.45, 1.55, motion), active);
 }
 
 float yazelixRioCursorEdgeWidth(float motion, float active) {
