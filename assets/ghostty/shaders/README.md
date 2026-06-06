@@ -22,71 +22,69 @@ shaders/
 │   ├── orchid.glsl
 │   ├── reef.glsl
 │   └── magma.glsl
-├── build_shaders.nu             # Build script (nushell, runs automatically)
 └── cursor_trail_*.glsl          # Generated locally/runtime only (gitignored)
 ```
 
 ## How It Works
 
-Yazelix copies the shader sources into the runtime Ghostty shader directory, runs
-`build_shaders.nu`, and then writes data-driven cursor variants from
-`cursors.toml`. Hand-tuned variants remain in `variants/`, while `mono`
-and `split` presets are rendered from cursor registry data.
+`yzc generate ghostty` and Yazelix runtime materialization copy these packaged
+shader sources, then call the Rust `yazelix_cursors` shader generators. Hand-tuned
+variants remain in `variants/`, while `mono` and `split` presets are rendered from
+cursor registry data.
 
 ## Making Changes
 
 ### To modify shared functions:
 
 1. Edit `cursor_trail_common.glsl`
-2. Shaders will be **automatically rebuilt** next time Yazelix starts or configs are regenerated
+2. Run `yzc generate ghostty` or the Yazelix runtime materialization path to regenerate outputs
 
 ### To modify a specific shader variant:
 
 1. Edit the variant file in `variants/` directory (e.g., `variants/white.glsl`)
-2. Shaders will be **automatically rebuilt** next time Yazelix starts or configs are regenerated
+2. Run `yzc generate ghostty` or the Yazelix runtime materialization path to regenerate outputs
 
 ### To create a new variant:
 
 1. Create a new file in `variants/` directory (e.g., `variants/new_variant.glsl`)
 2. Add your variant-specific code (constants, helper functions, mainImage)
-3. Add the cursor to `yazelix_cursors_default.toml` or your local `~/.config/yazelix/cursors.toml`
-4. Shaders will be **automatically rebuilt** next time Yazelix starts or configs are regenerated
+3. Add the cursor to `yazelix_ghostty_cursors_default.toml` or your local `~/.config/yazelix_ghostty_cursors/settings.jsonc`
+4. Run `yzc generate ghostty` or the Yazelix runtime materialization path to regenerate outputs
 
 ### Manual build (for testing or local preview):
 
 ```bash
-nu build_shaders.nu medium
+yzc generate ghostty
 ```
 
-By default, that writes generated shaders into the normal runtime output tree:
+By default, that writes generated shaders into the standalone cursor config tree:
 
 ```text
-~/.local/share/yazelix/configs/terminal_emulators/ghostty/shaders
+~/.config/yazelix_ghostty_cursors/shaders
 ```
 
-If you really want to write to a different destination, pass an explicit output directory:
+For an isolated preview, pass explicit config and share roots:
 
 ```bash
-nu build_shaders.nu medium /tmp/ghostty_shader_preview
+yzc --config-dir /tmp/yazelix_cursor_preview --share-dir <package>/share/yazelix/yazelix_cursors init
+yzc --config-dir /tmp/yazelix_cursor_preview --share-dir <package>/share/yazelix/yazelix_cursors generate ghostty
 ```
 
 ## Build Process
 
-The build is **fully automatic**:
-- Runs during Yazelix startup when terminal configs are generated
+The build is Rust-owned:
+- Runs from `yzc generate ghostty` and Yazelix terminal materialization
 - Combines `cursor_trail_common.glsl` with each variant in `variants/`
 - Outputs complete shaders ready for Ghostty to use
-- No manual intervention needed!
-- Honors `settings.glow = none | low | medium | high` from `cursors.toml`
-- Honors `settings.duration = 0.25..4.0` from `cursors.toml` as a multiplier for movement-trail timing
+- Does not require Nushell
+- Honors `settings.glow = none | low | medium | high` from `settings.jsonc`
+- Honors `settings.duration = 0.25..4.0` from `settings.jsonc` as a multiplier for movement-trail timing
 
 ## Important Notes
 
 - **DO NOT directly edit** the generated `cursor_trail_*.glsl` files - your changes will be overwritten
 - **ALWAYS edit** either `cursor_trail_common.glsl` or files in `variants/`
-- Shaders are **automatically built** during Yazelix startup - no manual steps needed!
-- The generated shaders are **not** git-tracked; the maintained source is the common library, variants, and build script
-- The manual build command defaults to the runtime output directory so it does not dirty the source tree
+- The generated shaders are **not** git-tracked; the maintained source is the common library, variants, and Rust generator
 
 ## Variant Categories
 

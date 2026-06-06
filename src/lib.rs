@@ -33,6 +33,85 @@ const GHOSTTY_CURSOR_EFFECT_TEMPLATES: &[(&str, &str)] = &[
 ];
 const GHOSTTY_CURSOR_MOVEMENT_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct CursorTargetContract {
+    pub name: &'static str,
+    pub status: &'static str,
+    pub emits: &'static [&'static str],
+    pub requires: &'static [&'static str],
+    pub notes: &'static [&'static str],
+}
+
+const CURSOR_TARGET_CONTRACTS: &[CursorTargetContract] = &[
+    CursorTargetContract {
+        name: "ghostty",
+        status: "supported",
+        emits: &[
+            "ghostty_include",
+            "ghostty_palette_shaders",
+            "ghostty_effect_shaders",
+        ],
+        requires: &[
+            "iCurrentCursor",
+            "iPreviousCursor",
+            "iCurrentCursorColor",
+            "iTimeCursorChange",
+        ],
+        notes: &["Standalone `yzc generate ghostty` writes the include and shaders."],
+    },
+    CursorTargetContract {
+        name: "yzxterm",
+        status: "supported",
+        emits: &["ghostty_palette_shaders", "ghostty_effect_shaders"],
+        requires: &[
+            "YAZELIX_TERMINAL_RIO_TRAIL",
+            "iYazelixRioTrailActive",
+            "iYazelixRioTrailAnimating",
+            "iYazelixRioTrailAnimatedCursor",
+            "iYazelixRioTrailCorners",
+        ],
+        notes: &["Yazelix owns launch-scoped config placement; this crate owns shader content."],
+    },
+    CursorTargetContract {
+        name: "rio",
+        status: "abi_documented",
+        emits: &["ghostty_palette_shaders", "ghostty_effect_shaders"],
+        requires: &[
+            "YAZELIX_TERMINAL_RIO_TRAIL",
+            "rio_trail_uniforms",
+            "native_cursor_visibility_control",
+        ],
+        notes: &["Rio-compatible consumers provide the terminal-side uniform ABI."],
+    },
+    CursorTargetContract {
+        name: "ratty",
+        status: "experimental_noop",
+        emits: &[],
+        requires: &["terminal_cursor_effect_surface"],
+        notes: &["Ratty has an explicit target slot but no emitted shader/protocol payload yet."],
+    },
+    CursorTargetContract {
+        name: "protocol_cursor_positions",
+        status: "documented_noop",
+        emits: &[],
+        requires: &[
+            "editor_cursor_position_events",
+            "terminal_multiple_cursor_protocol",
+        ],
+        notes: &["Protocol-backed cursors are separate from Ghostty-compatible shader files."],
+    },
+];
+
+pub fn cursor_target_contracts() -> &'static [CursorTargetContract] {
+    CURSOR_TARGET_CONTRACTS
+}
+
+pub fn cursor_target_contract(name: &str) -> Option<&'static CursorTargetContract> {
+    CURSOR_TARGET_CONTRACTS
+        .iter()
+        .find(|target| target.name == name)
+}
+
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CursorErrorClass {
@@ -1638,6 +1717,44 @@ color = "#ffb929"
 {extra}
 "##
         )
+    }
+
+    // Defends: terminal cursor targets are an explicit child-owned contract, not main-repo-only shader branches.
+    // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
+    #[test]
+    fn cursor_target_contracts_cover_terminal_shader_and_protocol_boundaries() {
+        let target_names: Vec<&str> = cursor_target_contracts()
+            .iter()
+            .map(|target| target.name)
+            .collect();
+
+        assert_eq!(
+            target_names,
+            vec![
+                "ghostty",
+                "yzxterm",
+                "rio",
+                "ratty",
+                "protocol_cursor_positions"
+            ]
+        );
+
+        let yzxterm = cursor_target_contract("yzxterm").unwrap();
+        assert_eq!(yzxterm.status, "supported");
+        assert!(yzxterm.emits.contains(&"ghostty_palette_shaders"));
+        assert!(yzxterm.requires.contains(&"YAZELIX_TERMINAL_RIO_TRAIL"));
+        assert!(yzxterm.requires.contains(&"iYazelixRioTrailAnimatedCursor"));
+
+        let ratty = cursor_target_contract("ratty").unwrap();
+        assert_eq!(ratty.status, "experimental_noop");
+        assert!(ratty.emits.is_empty());
+
+        let protocol = cursor_target_contract("protocol_cursor_positions").unwrap();
+        assert!(
+            protocol
+                .requires
+                .contains(&"terminal_multiple_cursor_protocol")
+        );
     }
 
     // Defends: the shipped cursor registry can resolve a one-item enabled list and random only draws from that list.

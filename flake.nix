@@ -145,8 +145,27 @@ EOF
             for required in $required_files; do
               test -s "$required"
             done
+            test ! -e "$share_dir/shaders/build_shaders.nu"
             grep -q "custom-shader = $share_dir/shaders/cursor_trail_blaze.glsl" "$examples_dir/ghostty_blaze_tail.conf"
           '';
+
+          passthru.yazelixCursorPackageContract = {
+            schemaVersion = 1;
+            packageName = "yazelix-cursors";
+            shareRoot = "share/yazelix/yazelix_cursors";
+            shaderRoot = "share/yazelix/yazelix_cursors/shaders";
+            generatedEffectRoot = "share/yazelix/yazelix_cursors/shaders/generated_effects";
+            requiredTargets = [
+              "ghostty"
+              "yzxterm"
+              "rio"
+              "ratty"
+              "protocol_cursor_positions"
+            ];
+            forbiddenShaderFiles = [
+              "build_shaders.nu"
+            ];
+          };
 
           meta = {
             description = "Standalone Yazelix cursor presets and terminal shader outputs";

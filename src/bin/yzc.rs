@@ -4,9 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use yazelix_cursors::{
     CursorDefinition, CursorError, CursorErrorClass, CursorFamily, CursorRegistry,
-    ResolvedCursorRegistryState, SplitDivider, format_ghostty_trail_duration, parse_jsonc_value,
-    render_cursor_settings_jsonc, write_ghostty_cursor_effect_shaders,
-    write_ghostty_cursor_palette_shaders,
+    ResolvedCursorRegistryState, SplitDivider, cursor_target_contracts,
+    format_ghostty_trail_duration, parse_jsonc_value, render_cursor_settings_jsonc,
+    write_ghostty_cursor_effect_shaders, write_ghostty_cursor_palette_shaders,
 };
 
 const DEFAULT_CURSOR_CONFIG: &str = include_str!("../../yazelix_ghostty_cursors_default.toml");
@@ -28,6 +28,7 @@ struct Cli {
 enum Command {
     Init,
     List,
+    ListTargets,
     Inspect,
     Current { format: CurrentFormat },
     GenerateGhostty,
@@ -64,6 +65,7 @@ fn run() -> Result<(), CursorError> {
     match cli.command {
         Command::Init => run_init(&cli),
         Command::List => run_list(&cli),
+        Command::ListTargets => run_list_targets(),
         Command::Inspect => run_inspect(&cli),
         Command::Current { format } => run_current(&cli, format),
         Command::GenerateGhostty => run_generate_ghostty(&cli),
@@ -115,6 +117,7 @@ fn parse_cli(args: impl IntoIterator<Item = String>) -> Result<Cli, CursorError>
         [single] if matches!(single.as_str(), "-h" | "--help" | "help") => Command::Help,
         [single] if single == "init" => Command::Init,
         [single] if single == "list" => Command::List,
+        [single] if single == "list-targets" => Command::ListTargets,
         [single] if single == "inspect" => Command::Inspect,
         [single] if single == "current" => Command::Current {
             format: CurrentFormat::Env,
@@ -362,12 +365,24 @@ fn run_generate_ghostty(cli: &Cli) -> Result<(), CursorError> {
     Ok(())
 }
 
+fn run_list_targets() -> Result<(), CursorError> {
+    for target in cursor_target_contracts() {
+        println!("{}", target.name);
+        println!("  status: {}", target.status);
+        println!("  emits: {}", target.emits.join(", "));
+        println!("  requires: {}", target.requires.join(", "));
+        println!("  notes: {}", target.notes.join(" "));
+    }
+    Ok(())
+}
+
 fn print_help() {
     println!("Yazelix Cursors");
     println!();
     println!("Usage:");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] init");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] list");
+    println!("  yzc list-targets");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] inspect");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] current [--format env|json]");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] generate ghostty");
