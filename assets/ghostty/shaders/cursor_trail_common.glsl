@@ -208,32 +208,32 @@ float yazelixRioTrailSdf(in vec2 vu, in vec2 offsetFactor) {
 #endif
 }
 
-float yazelixRioTrailGlowWidth(float motion, float active) {
-    return mix(0.035, mix(0.018, 0.300, motion), active);
+float yazelixRioTrailGlowWidth(float motion, float activity) {
+    return mix(0.035, mix(0.018, 0.300, motion), activity);
 }
 
-float yazelixRioTrailGlowGain(float motion, float active) {
-    return mix(1.0, mix(0.65, 1.75, motion), active);
+float yazelixRioTrailGlowGain(float motion, float activity) {
+    return mix(1.0, mix(0.65, 1.75, motion), activity);
 }
 
-float yazelixRioTrailEdgeWidth(float motion, float active) {
-    return mix(0.006, mix(0.007, 0.032, motion), active);
+float yazelixRioTrailEdgeWidth(float motion, float activity) {
+    return mix(0.006, mix(0.007, 0.032, motion), activity);
 }
 
-float yazelixRioTrailSaturation(float fallback, float motion, float active) {
-    return mix(fallback, mix(1.55, 2.50, motion), active);
+float yazelixRioTrailSaturation(float fallback, float motion, float activity) {
+    return mix(fallback, mix(1.55, 2.50, motion), activity);
 }
 
-float yazelixRioCursorGlowWidth(float motion, float active) {
-    return mix(0.004, mix(0.003, 0.022, motion), active);
+float yazelixRioCursorGlowWidth(float motion, float activity) {
+    return mix(0.004, mix(0.003, 0.022, motion), activity);
 }
 
-float yazelixRioCursorGlowGain(float motion, float active) {
-    return mix(1.0, mix(0.70, 1.55, motion), active);
+float yazelixRioCursorGlowGain(float motion, float activity) {
+    return mix(1.0, mix(0.70, 1.55, motion), activity);
 }
 
-float yazelixRioCursorEdgeWidth(float motion, float active) {
-    return mix(0.004, mix(0.005, 0.014, motion), active);
+float yazelixRioCursorEdgeWidth(float motion, float activity) {
+    return mix(0.004, mix(0.005, 0.014, motion), activity);
 }
 
 void renderMonoColorTrail(
