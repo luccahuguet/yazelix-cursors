@@ -30,7 +30,7 @@ such as `glow` and `duration`.
 
 ### To modify a preset:
 
-1. Edit its `[[cursor]]` table in `yazelix_ghostty_cursors_default.toml` or your local `~/.config/yazelix_ghostty_cursors/settings.jsonc`
+1. Edit its `[[cursor]]` table in `yazelix_cursors_default.toml` or your local `~/.config/yazelix_cursors/settings.jsonc`
 2. Run `yzc generate ghostty` or the Yazelix runtime materialization path to regenerate outputs
 
 ### To create a new preset:
@@ -48,7 +48,7 @@ yzc generate ghostty
 By default, that writes generated shaders into the standalone cursor config tree:
 
 ```text
-~/.config/yazelix_ghostty_cursors/shaders
+~/.config/yazelix_cursors/shaders
 ```
 
 For an isolated preview, pass explicit config and share roots:

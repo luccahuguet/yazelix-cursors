@@ -13,8 +13,8 @@ use yazelix_ratconfig::migration::{
     MigrationError, MigrationMutation, MigrationOp, apply_migrations_text,
 };
 
-pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_ghostty_cursors_default.toml";
-pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_ghostty_cursors";
+pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_cursors_default.toml";
+pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
 pub const STANDALONE_CURSOR_SETTINGS_FILENAME: &str = "settings.jsonc";
 pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
@@ -361,7 +361,7 @@ pub fn load_cursor_settings_jsonc(
         CursorError::io(
             "read_cursor_settings_jsonc",
             "Could not read Yazelix cursor settings.jsonc",
-            "Run `yzc init`, or restore ~/.config/yazelix_ghostty_cursors/settings.jsonc, then retry.",
+            "Run `yzc init`, or restore ~/.config/yazelix_cursors/settings.jsonc, then retry.",
             path.to_string_lossy(),
             source,
         )
@@ -382,7 +382,7 @@ pub fn persist_migrated_cursor_settings_jsonc(
         CursorError::io(
             "backup_cursor_settings_jsonc_before_migration",
             "Could not back up Yazelix cursor settings.jsonc before migration",
-            "Check permissions for ~/.config/yazelix_ghostty_cursors and retry.",
+            "Check permissions for ~/.config/yazelix_cursors and retry.",
             backup_path.to_string_lossy(),
             source,
         )
@@ -393,7 +393,7 @@ pub fn persist_migrated_cursor_settings_jsonc(
         CursorError::io(
             "write_migrated_cursor_settings_jsonc",
             "Could not write migrated Yazelix cursor settings.jsonc",
-            "Check permissions for ~/.config/yazelix_ghostty_cursors and retry.",
+            "Check permissions for ~/.config/yazelix_cursors and retry.",
             temp_path.to_string_lossy(),
             source,
         )
@@ -403,7 +403,7 @@ pub fn persist_migrated_cursor_settings_jsonc(
         return Err(CursorError::io(
             "replace_migrated_cursor_settings_jsonc",
             "Could not replace Yazelix cursor settings.jsonc with the migrated version",
-            "Check permissions for ~/.config/yazelix_ghostty_cursors and retry.",
+            "Check permissions for ~/.config/yazelix_cursors and retry.",
             path.to_string_lossy(),
             source,
         ));
@@ -537,7 +537,7 @@ fn cursor_settings_migration_error(path: &Path, source: MigrationError) -> Curso
             "Could not migrate Yazelix cursor settings JSONC at {}.",
             path.display()
         ),
-        "Fix ~/.config/yazelix_ghostty_cursors/settings.jsonc or move it aside and run `yzc init`.",
+        "Fix ~/.config/yazelix_cursors/settings.jsonc or move it aside and run `yzc init`.",
         json!({
             "path": path.display().to_string(),
             "error": format!("{source:?}"),
@@ -916,7 +916,7 @@ pub fn render_cursor_settings_jsonc(registry: &CursorRegistry) -> String {
     let mut out = String::new();
     out.push_str("// Yazelix Cursors settings\n");
     out.push_str("// Edit this file through `yzx config ui`, `yzc init`, or your editor.\n");
-    out.push_str("// In Ghostty standalone setups, add: config-file = ~/.config/yazelix_ghostty_cursors/ghostty.conf\n");
+    out.push_str("// In Ghostty standalone setups, add: config-file = ~/.config/yazelix_cursors/ghostty.conf\n");
     out.push_str("{\n");
     out.push_str(&format!(
         "  \"schema_version\": {},\n",
@@ -2230,7 +2230,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
     #[test]
     fn palette_shader_generation_applies_rio_tuning_to_every_default_preset() {
-        let (_temp, path) = write_registry(include_str!("../yazelix_ghostty_cursors_default.toml"));
+        let (_temp, path) = write_registry(include_str!("../yazelix_cursors_default.toml"));
         let registry = load_registry(&path).unwrap();
         let shader_dir = tempdir().unwrap();
         copy_packaged_shader_sources(shader_dir.path());
@@ -2317,7 +2317,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
     fn shipped_default_registry_parses_active_cursor_surface() {
-        let (_temp, path) = write_registry(include_str!("../yazelix_ghostty_cursors_default.toml"));
+        let (_temp, path) = write_registry(include_str!("../yazelix_cursors_default.toml"));
 
         let registry = load_registry(&path).unwrap();
 

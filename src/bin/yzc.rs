@@ -10,8 +10,8 @@ use yazelix_cursors::{
     write_ghostty_cursor_effect_shaders, write_ghostty_cursor_palette_shaders,
 };
 
-const DEFAULT_CURSOR_CONFIG: &str = include_str!("../../yazelix_ghostty_cursors_default.toml");
-const CONFIG_DIR_NAME: &str = "yazelix_ghostty_cursors";
+const DEFAULT_CURSOR_CONFIG: &str = include_str!("../../yazelix_cursors_default.toml");
+const CONFIG_DIR_NAME: &str = "yazelix_cursors";
 const SETTINGS_FILE_NAME: &str = "settings.jsonc";
 const GHOSTTY_INCLUDE_FILE_NAME: &str = "ghostty.conf";
 const SHARE_RELATIVE_PATH: &[&str] = &["share", "yazelix", "yazelix_cursors"];
@@ -175,7 +175,7 @@ fn run_init(cli: &Cli) -> Result<(), CursorError> {
     }
 
     let default_registry = CursorRegistry::parse_str(
-        Path::new("yazelix_ghostty_cursors_default.toml"),
+        Path::new("yazelix_cursors_default.toml"),
         DEFAULT_CURSOR_CONFIG,
     )?;
     let content = render_cursor_settings_jsonc(&default_registry);
@@ -389,11 +389,11 @@ fn print_help() {
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] generate ghostty");
     println!();
     println!("Defaults:");
-    println!("  config: ~/.config/yazelix_ghostty_cursors/settings.jsonc");
-    println!("  Ghostty include: ~/.config/yazelix_ghostty_cursors/ghostty.conf");
+    println!("  config: ~/.config/yazelix_cursors/settings.jsonc");
+    println!("  Ghostty include: ~/.config/yazelix_cursors/ghostty.conf");
     println!();
     println!("Ghostty opt-in:");
-    println!("  config-file = ~/.config/yazelix_ghostty_cursors/ghostty.conf");
+    println!("  config-file = ~/.config/yazelix_cursors/ghostty.conf");
 }
 
 fn paths(config_dir: &Path) -> Paths {

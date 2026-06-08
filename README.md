@@ -35,7 +35,7 @@ yzc generate ghostty
 Then include it from Ghostty:
 
 ```conf
-config-file = ~/.config/yazelix_ghostty_cursors/ghostty.conf
+config-file = ~/.config/yazelix_cursors/ghostty.conf
 ```
 
 Day-to-day commands:
@@ -44,7 +44,7 @@ Day-to-day commands:
 yzc list
 yzc list-targets
 yzc inspect
-$EDITOR ~/.config/yazelix_ghostty_cursors/settings.jsonc
+$EDITOR ~/.config/yazelix_cursors/settings.jsonc
 yzc generate ghostty
 ```
 
@@ -53,19 +53,19 @@ yzc generate ghostty
 The standalone config still lives at the existing compatibility path:
 
 ```text
-~/.config/yazelix_ghostty_cursors/settings.jsonc
+~/.config/yazelix_cursors/settings.jsonc
 ```
 
 The generated Ghostty include lives at:
 
 ```text
-~/.config/yazelix_ghostty_cursors/ghostty.conf
+~/.config/yazelix_cursors/ghostty.conf
 ```
 
 Ghostty-compatible shader files are generated into:
 
 ```text
-~/.config/yazelix_ghostty_cursors/shaders
+~/.config/yazelix_cursors/shaders
 ```
 
 ## Cursor Options
@@ -96,7 +96,7 @@ Effects are global per generated Ghostty include. Ghostty does not support per-c
 
 ## Compatibility
 
-The repository is named `yazelix-cursors` because the cursor registry and shader assets are shared by Yazelix terminals, including Yazelix Terminal. The old `yazelix-ghostty-cursors` GitHub URL, Nix package output, and config directory remain compatibility surfaces for now.
+The repository is named `yazelix-cursors` because the cursor registry and shader assets are shared by Yazelix terminals, including Yazelix Terminal. The old `yazelix-ghostty-cursors` package/config names are not exposed as compatibility aliases.
 
 ## Boundary With Yazelix
 
@@ -116,8 +116,8 @@ The crate must not depend on:
 - Product/repository: `yazelix-cursors`
 - Command: `yzc`
 - Rust crate: `yazelix_cursors`
-- Compatibility Nix output: `yazelix_ghostty_cursors`
-- Compatibility config directory: `~/.config/yazelix_ghostty_cursors`
+- Nix output: `yazelix_cursors`
+- Config directory: `~/.config/yazelix_cursors`
 - Integrated Yazelix command: `yzx cursors`
 
 ## Verification
@@ -131,6 +131,5 @@ cargo test
 cargo run --bin yzc -- --help
 cargo run --bin yzc -- list-targets
 nix build .#yazelix_cursors
-nix build .#yazelix_ghostty_cursors
 nix run .#yzc -- --help
 ```

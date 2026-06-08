@@ -70,8 +70,6 @@
             set -eu
 
             share_dir="$out/share/yazelix/yazelix_cursors"
-            legacy_share_dir="$out/share/yazelix/yazelix_ghostty_cursors"
-            legacy_shader_dir="$out/share/yazelix/ghostty_cursor_shaders"
             examples_dir="$share_dir/examples"
             work="$TMPDIR/yazelix_cursors_export"
             config_dir="$work/config"
@@ -109,7 +107,7 @@ yzc generate ghostty
 Then include the generated file from Ghostty:
 
 \`\`\`conf
-config-file = ~/.config/yazelix_ghostty_cursors/ghostty.conf
+config-file = ~/.config/yazelix_cursors/ghostty.conf
 \`\`\`
 
 Use one cursor palette shader and one optional effect shader in your Ghostty config:
@@ -133,9 +131,6 @@ $examples_dir/ghostty_blaze_tail.conf
 
 This package does not mutate your Ghostty config and does not include Yazelix runtime reroll behavior
 EOF
-
-            ln -s "$share_dir" "$legacy_share_dir"
-            ln -s "$share_dir" "$legacy_shader_dir"
 
             required_files="
               $share_dir/shaders/cursor_trail_blaze.glsl
@@ -197,8 +192,6 @@ EOF
           default = yzc;
           yzc = yzc;
           yazelix_cursors = yzc;
-          yazelix_ghostty_cursors = yzc;
-          ghostty_cursor_shaders = yzc;
         }
       );
 
@@ -212,14 +205,6 @@ EOF
           program = "${self.packages.${system}.yzc}/bin/yzc";
         };
         yazelix_cursors = {
-          type = "app";
-          program = "${self.packages.${system}.yzc}/bin/yzc";
-        };
-        yazelix_ghostty_cursors = {
-          type = "app";
-          program = "${self.packages.${system}.yzc}/bin/yzc";
-        };
-        ghostty_cursor_shaders = {
           type = "app";
           program = "${self.packages.${system}.yzc}/bin/yzc";
         };
