@@ -2453,6 +2453,7 @@ colors = ["#ff1600", "#2a3340"]"##,
 
         assert!(registry.enabled_cursors.contains(&"blaze".to_string()));
         assert!(registry.enabled_cursors.contains(&"snow".to_string()));
+        assert!(registry.enabled_cursors.contains(&"ice".to_string()));
         assert!(registry.enabled_cursors.contains(&"midnight".to_string()));
         assert!(!registry.enabled_cursors.contains(&"neon".to_string()));
         assert!(registry.enabled_cursors.contains(&"magma".to_string()));
@@ -2474,6 +2475,10 @@ colors = ["#ff1600", "#2a3340"]"##,
         assert_eq!(
             registry.definitions.get("reef").unwrap().colors[1].hex,
             "#00ff66"
+        );
+        assert_eq!(
+            registry.definitions.get("ice").unwrap().colors[0].hex,
+            "#38bdf8"
         );
         assert_eq!(
             registry.definitions.get("midnight").unwrap().colors[0].hex,
