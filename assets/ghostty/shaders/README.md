@@ -77,7 +77,7 @@ The build is Rust-owned:
 ## Variant Categories
 
 ### Mono (6 presets)
-- `blaze`, `snow`, `sunset`, `ocean`, `forest`, `cosmic`
+- `blaze`, `midnight`, `sunset`, `ocean`, `forest`, `cosmic`
 - Each preset defines one base color in `yazelix_cursors_default.toml`; Yazelix derives the accent unless `accent_color` overrides it
 
 ### Split (5 presets)

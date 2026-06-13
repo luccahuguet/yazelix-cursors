@@ -72,7 +72,7 @@ Ghostty-compatible shader files are generated into:
 
 Cursor trail selection supports:
 
-- a named enabled cursor, such as `blaze`, `magma`, or `snow`
+- a named enabled cursor, such as `blaze`, `magma`, or `midnight`
 - `random`
 - `none`
 
