@@ -72,9 +72,11 @@ Ghostty-compatible shader files are generated into:
 
 Cursor trail selection supports:
 
-- a named enabled cursor, such as `blaze`, `magma`, or `midnight`
+- a named enabled cursor, such as `blaze`, `magma`, `snow`, or `midnight`
 - `random`
 - `none`
+
+When a Yazelix consumer passes light or auto appearance context, `random` skips `snow` when another enabled cursor is available. Explicit `snow` selections are still honored.
 
 Trail and mode effects support:
 

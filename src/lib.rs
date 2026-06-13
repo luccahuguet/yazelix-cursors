@@ -24,6 +24,7 @@ const SUPPORTED_TRAIL_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
 const SUPPORTED_MODE_EFFECTS: &[&str] =
     &["ripple", "sonic_boom", "rectangle_boom", "ripple_rectangle"];
 const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
+const LIGHT_RANDOM_EXCLUDED_CURSOR_NAMES: &[&str] = &["snow"];
 const REMOVED_CURSOR_NAMES: &[&str] = &["party", RETIRED_CURSOR_NAME];
 const RETIRED_CURSOR_NAME: &str = "neon";
 const RETIRED_CURSOR_FAMILY: &str = "curated_template";
@@ -732,13 +733,25 @@ impl CursorRegistry {
     }
 
     pub fn resolve_with_entropy(&self, entropy: usize) -> ResolvedCursorRegistryState {
+        self.resolve_with_entropy_for_appearance(entropy, "dark")
+    }
+
+    pub fn resolve_for_appearance(&self, appearance_mode: &str) -> ResolvedCursorRegistryState {
+        let entropy = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos() as usize)
+            .unwrap_or(0);
+        self.resolve_with_entropy_for_appearance(entropy, appearance_mode)
+    }
+
+    pub fn resolve_with_entropy_for_appearance(
+        &self,
+        entropy: usize,
+        appearance_mode: &str,
+    ) -> ResolvedCursorRegistryState {
         let selected_cursor = match self.settings.trail.as_str() {
             "none" => None,
-            "random" => self
-                .enabled_cursors
-                .get(entropy % self.enabled_cursors.len())
-                .and_then(|name| self.definitions.get(name))
-                .cloned(),
+            "random" => self.random_cursor_name_for_appearance(entropy, appearance_mode),
             name => self.definitions.get(name).cloned(),
         };
 
@@ -758,6 +771,39 @@ impl CursorRegistry {
             duration: self.settings.duration,
             glow: self.settings.glow.clone(),
             kitty_enable_cursor: self.settings.kitty_enable_cursor,
+        }
+    }
+
+    fn random_cursor_name_for_appearance(
+        &self,
+        entropy: usize,
+        appearance_mode: &str,
+    ) -> Option<CursorDefinition> {
+        let pool = self.random_cursor_pool_for_appearance(appearance_mode);
+        pool.get(entropy % pool.len())
+            .and_then(|name| self.definitions.get(*name))
+            .cloned()
+    }
+
+    fn random_cursor_pool_for_appearance(&self, appearance_mode: &str) -> Vec<&str> {
+        if !light_safe_random_pool(appearance_mode) {
+            return self.enabled_cursors.iter().map(String::as_str).collect();
+        }
+
+        let filtered = self
+            .enabled_cursors
+            .iter()
+            .map(String::as_str)
+            .filter(|name| {
+                !LIGHT_RANDOM_EXCLUDED_CURSOR_NAMES
+                    .iter()
+                    .any(|excluded| name.eq_ignore_ascii_case(excluded))
+            })
+            .collect::<Vec<_>>();
+        if filtered.is_empty() {
+            self.enabled_cursors.iter().map(String::as_str).collect()
+        } else {
+            filtered
         }
     }
 
@@ -863,6 +909,13 @@ impl CursorDefinition {
     pub fn cursor_color_literal(&self) -> String {
         self.cursor_color.glsl_vec4()
     }
+}
+
+fn light_safe_random_pool(appearance_mode: &str) -> bool {
+    matches!(
+        appearance_mode.trim().to_ascii_lowercase().as_str(),
+        "light" | "auto"
+    )
 }
 
 impl CursorFamily {
@@ -1882,6 +1935,33 @@ color = "#ffb929"
         )
     }
 
+    fn snow_random_registry(trail: &str) -> String {
+        format!(
+            r##"
+schema_version = 1
+enabled_cursors = ["snow", "blaze"]
+
+[settings]
+trail = "{trail}"
+trail_effect = "tail"
+mode_effect = "ripple"
+glow = "medium"
+duration = 1.0
+kitty_enable_cursor = true
+
+[[cursor]]
+name = "snow"
+family = "mono"
+color = "#ffffff"
+
+[[cursor]]
+name = "blaze"
+family = "mono"
+color = "#ffb929"
+"##
+        )
+    }
+
     // Defends: terminal cursor targets are an explicit child-owned contract, not main-repo-only shader branches.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
@@ -1936,6 +2016,56 @@ color = "#ffb929"
             Some("ripple_rectangle".to_string())
         );
         assert!(resolved.kitty_enable_cursor);
+    }
+
+    // Regression: light and auto appearance keep the configured random pool but skip snow when another cursor is available.
+    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
+    #[test]
+    fn random_cursor_resolution_skips_snow_for_light_safe_appearances() {
+        let (_temp, path) = write_registry(&snow_random_registry("random"));
+        let registry = load_registry(&path).unwrap();
+
+        assert_eq!(
+            registry
+                .resolve_with_entropy_for_appearance(0, "dark")
+                .selected_cursor
+                .unwrap()
+                .name,
+            "snow"
+        );
+        assert_eq!(
+            registry
+                .resolve_with_entropy_for_appearance(0, "light")
+                .selected_cursor
+                .unwrap()
+                .name,
+            "blaze"
+        );
+        assert_eq!(
+            registry
+                .resolve_with_entropy_for_appearance(0, "auto")
+                .selected_cursor
+                .unwrap()
+                .name,
+            "blaze"
+        );
+    }
+
+    // Defends: explicitly selecting snow remains a user-owned choice even when light mode is active.
+    // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
+    #[test]
+    fn explicit_snow_cursor_selection_is_not_filtered_by_light_mode() {
+        let (_temp, path) = write_registry(&snow_random_registry("snow"));
+        let registry = load_registry(&path).unwrap();
+
+        assert_eq!(
+            registry
+                .resolve_with_entropy_for_appearance(0, "light")
+                .selected_cursor
+                .unwrap()
+                .name,
+            "snow"
+        );
     }
 
     // Defends: mono cursors accept one base color and derive the shader accent without requiring palette duplication.
@@ -2322,8 +2452,8 @@ colors = ["#ff1600", "#2a3340"]"##,
         let registry = load_registry(&path).unwrap();
 
         assert!(registry.enabled_cursors.contains(&"blaze".to_string()));
+        assert!(registry.enabled_cursors.contains(&"snow".to_string()));
         assert!(registry.enabled_cursors.contains(&"midnight".to_string()));
-        assert!(!registry.enabled_cursors.contains(&"snow".to_string()));
         assert!(!registry.enabled_cursors.contains(&"neon".to_string()));
         assert!(registry.enabled_cursors.contains(&"magma".to_string()));
         assert!(!registry.enabled_cursors.contains(&"inferno".to_string()));

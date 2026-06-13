@@ -134,6 +134,7 @@ EOF
 
             required_files="
               $share_dir/shaders/cursor_trail_blaze.glsl
+              $share_dir/shaders/cursor_trail_snow.glsl
               $share_dir/shaders/cursor_trail_midnight.glsl
               $share_dir/shaders/cursor_trail_eclipse.glsl
               $share_dir/shaders/cursor_trail_magma.glsl
