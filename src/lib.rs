@@ -1,5 +1,6 @@
 //! Reusable Yazelix cursor registry and Ghostty shader generation.
 
+use ratconfig::migration::{MigrationError, MigrationMutation, MigrationOp, apply_migrations_text};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,9 +10,6 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-use ratconfig::migration::{
-    MigrationError, MigrationMutation, MigrationOp, apply_migrations_text,
-};
 
 pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_cursors_default.toml";
 pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
