@@ -15,7 +15,7 @@ nix profile install github:luccahuguet/yazelix-cursors#yazelix_cursors
 - Data-driven cursor palette generation
 - Ghostty-compatible cursor effect shader generation
 - Packaged shader assets and generated shader examples
-- Terminal target contracts for Ghostty, yzxterm, Rio, Ratty, and protocol cursor positions
+- Terminal target contracts for Ghostty, mars, Rio, Ratty, and protocol cursor positions
 - A standalone `yzc` binary
 
 ## Standalone Ghostty-Compatible Usage
@@ -91,7 +91,7 @@ Effects are global per generated Ghostty include. Ghostty does not support per-c
 `yzc list-targets` prints the child-owned target contract used by package consumers:
 
 - `ghostty` emits a Ghostty include plus palette and effect shader files
-- `yzxterm` consumes the Ghostty-compatible shader files with the Rio trail uniform ABI
+- `mars` consumes the Ghostty-compatible shader files with the Rio trail uniform ABI
 - `rio` documents the Rio-compatible shader ABI surface
 - `ratty` has an explicit experimental no-op target slot
 - `protocol_cursor_positions` documents protocol-backed multi-cursor output as separate from GLSL shaders

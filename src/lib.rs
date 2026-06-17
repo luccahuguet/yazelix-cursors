@@ -66,11 +66,11 @@ const CURSOR_TARGET_CONTRACTS: &[CursorTargetContract] = &[
         notes: &["Standalone `yzc generate ghostty` writes the include and shaders."],
     },
     CursorTargetContract {
-        name: "yzxterm",
+        name: "mars",
         status: "supported",
         emits: &["ghostty_palette_shaders", "ghostty_effect_shaders"],
         requires: &[
-            "YAZELIX_TERMINAL_RIO_TRAIL",
+            "MARS_RIO_TRAIL",
             "iYazelixRioTrailActive",
             "iYazelixRioTrailAnimating",
             "iYazelixRioTrailAnimatedCursor",
@@ -83,7 +83,7 @@ const CURSOR_TARGET_CONTRACTS: &[CursorTargetContract] = &[
         status: "abi_documented",
         emits: &["ghostty_palette_shaders", "ghostty_effect_shaders"],
         requires: &[
-            "YAZELIX_TERMINAL_RIO_TRAIL",
+            "MARS_RIO_TRAIL",
             "rio_trail_uniforms",
             "native_cursor_visibility_control",
         ],
@@ -1973,18 +1973,18 @@ color = "#ffb929"
             target_names,
             vec![
                 "ghostty",
-                "yzxterm",
+                "mars",
                 "rio",
                 "ratty",
                 "protocol_cursor_positions"
             ]
         );
 
-        let yzxterm = cursor_target_contract("yzxterm").unwrap();
-        assert_eq!(yzxterm.status, "supported");
-        assert!(yzxterm.emits.contains(&"ghostty_palette_shaders"));
-        assert!(yzxterm.requires.contains(&"YAZELIX_TERMINAL_RIO_TRAIL"));
-        assert!(yzxterm.requires.contains(&"iYazelixRioTrailAnimatedCursor"));
+        let mars = cursor_target_contract("mars").unwrap();
+        assert_eq!(mars.status, "supported");
+        assert!(mars.emits.contains(&"ghostty_palette_shaders"));
+        assert!(mars.requires.contains(&"MARS_RIO_TRAIL"));
+        assert!(mars.requires.contains(&"iYazelixRioTrailAnimatedCursor"));
 
         let ratty = cursor_target_contract("ratty").unwrap();
         assert_eq!(ratty.status, "experimental_noop");

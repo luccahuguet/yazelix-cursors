@@ -159,7 +159,7 @@ EOF
             generatedEffectRoot = "share/yazelix/yazelix_cursors/shaders/generated_effects";
             requiredTargets = [
               "ghostty"
-              "yzxterm"
+              "mars"
               "rio"
               "ratty"
               "protocol_cursor_positions"
