@@ -202,6 +202,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "ratconfig"
+version = "0.1.0"
+source = "git+https://github.com/luccahuguet/ratconfig?rev=71dfb2d86acface4a7ff318eb0ffed01be9fe1fb#71dfb2d86acface4a7ff318eb0ffed01be9fe1fb"
+dependencies = [
+ "jsonc-parser",
+ "serde_json",
+ "toml",
+ "toml_edit",
+]
+
+[[package]]
 name = "rustix"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -572,28 +583,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 
 [[package]]
-name = "yazelix-ratconfig"
-version = "0.1.0"
-source = "git+https://github.com/luccahuguet/yazelix-ratconfig?rev=180994407b3c70d9c6cb6df5b03356ae59ecafd8#180994407b3c70d9c6cb6df5b03356ae59ecafd8"
-dependencies = [
- "jsonc-parser",
- "serde_json",
- "toml",
- "toml_edit",
-]
-
-[[package]]
 name = "yazelix_cursors"
 version = "0.1.0"
 dependencies = [
  "jsonc-parser",
  "pretty_assertions",
+ "ratconfig",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
  "toml",
- "yazelix-ratconfig",
 ]
 
 [[package]]

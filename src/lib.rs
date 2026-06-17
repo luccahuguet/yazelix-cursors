@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-use yazelix_ratconfig::migration::{
+use ratconfig::migration::{
     MigrationError, MigrationMutation, MigrationOp, apply_migrations_text,
 };
 
