@@ -48,6 +48,16 @@ $EDITOR ~/.config/yazelix_cursors/settings.jsonc
 yzc generate ghostty
 ```
 
+Generate a launch-local Rio-compatible config from a base `config.toml`:
+
+```bash
+yzc materialize rio-compatible-config --source-config ~/.config/rio/config.toml
+```
+
+The command prints the generated config directory. Launch Rio-derived
+terminals with their config-home environment variable pointing at that
+directory.
+
 ## Configuration
 
 The standalone config still lives at the existing compatibility path:
@@ -91,6 +101,8 @@ Effects are global per generated Ghostty include. Ghostty does not support per-c
 `yzc list-targets` prints the child-owned target contract used by package consumers:
 
 - `ghostty` emits a Ghostty include plus palette and effect shader files
+- `rio-compatible-config` materializes launch-local `[colors].cursor`
+  for Rio and Rio-derived terminals
 - `mars` consumes the Ghostty-compatible shader files with the Rio trail uniform ABI
 - `rio` documents the Rio-compatible shader ABI surface
 - `ratty` has an explicit experimental no-op target slot

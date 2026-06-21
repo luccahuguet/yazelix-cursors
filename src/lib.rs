@@ -66,6 +66,15 @@ const CURSOR_TARGET_CONTRACTS: &[CursorTargetContract] = &[
         notes: &["Standalone `yzc generate ghostty` writes the include and shaders."],
     },
     CursorTargetContract {
+        name: "rio-compatible-config",
+        status: "supported",
+        emits: &["rio_compatible_config"],
+        requires: &["colors.cursor"],
+        notes: &[
+            "`yzc materialize rio-compatible-config` writes a launch-local config for Rio and Rio-derived terminals.",
+        ],
+    },
+    CursorTargetContract {
         name: "mars",
         status: "supported",
         emits: &["ghostty_palette_shaders", "ghostty_effect_shaders"],
@@ -1973,12 +1982,18 @@ color = "#ffb929"
             target_names,
             vec![
                 "ghostty",
+                "rio-compatible-config",
                 "mars",
                 "rio",
                 "ratty",
                 "protocol_cursor_positions"
             ]
         );
+
+        let rio_config = cursor_target_contract("rio-compatible-config").unwrap();
+        assert_eq!(rio_config.status, "supported");
+        assert!(rio_config.emits.contains(&"rio_compatible_config"));
+        assert!(rio_config.requires.contains(&"colors.cursor"));
 
         let mars = cursor_target_contract("mars").unwrap();
         assert_eq!(mars.status, "supported");
