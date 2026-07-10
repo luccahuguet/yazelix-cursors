@@ -19,7 +19,7 @@ jsonc-parser = { version = "0.32.3", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-toml = "0.9"
+toml = "1.1"
 ratconfig = { git = "https://github.com/luccahuguet/ratconfig", rev = "004087e3e5b7098219d1d2d2c2dd8e74a36a1ba7", default-features = false }
 
 [dev-dependencies]
