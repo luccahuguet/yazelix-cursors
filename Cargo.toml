@@ -20,7 +20,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 toml = "0.9"
-ratconfig = { git = "https://github.com/luccahuguet/ratconfig", rev = "9d8fdc47ee6f0026ae16b331e167307b925277e3", default-features = false }
+ratconfig = { git = "https://github.com/luccahuguet/ratconfig", rev = "004087e3e5b7098219d1d2d2c2dd8e74a36a1ba7", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
