@@ -203,8 +203,8 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "ratconfig"
-version = "1.0.0"
-source = "git+https://github.com/luccahuguet/ratconfig?rev=004087e3e5b7098219d1d2d2c2dd8e74a36a1ba7#004087e3e5b7098219d1d2d2c2dd8e74a36a1ba7"
+version = "2.0.0"
+source = "git+https://github.com/luccahuguet/ratconfig?rev=110e749a5fb10e146611427564bd6afda0750827#110e749a5fb10e146611427564bd6afda0750827"
 dependencies = [
  "jsonc-parser",
  "serde_json",

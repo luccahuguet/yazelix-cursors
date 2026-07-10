@@ -57,7 +57,7 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
             outputHashes = {
-              "ratconfig-1.0.0" = "sha256-/CvcaWzGQ4Wtz13/t1A65ZWLK7euedI4exK4RA6OFLI=";
+              "ratconfig-2.0.0" = "sha256-NXnn7WOBEa7uQl8rs52gpIhpEGTeanRL5+au9ltjQyE=";
             };
           };
           cargoBuildFlags = [
