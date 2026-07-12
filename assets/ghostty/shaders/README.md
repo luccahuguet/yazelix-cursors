@@ -30,7 +30,7 @@ such as `glow` and `duration`.
 
 ### To modify a preset:
 
-1. Edit its `[[cursor]]` table in `yazelix_cursors_default.toml` or your local `~/.config/yazelix_cursors/settings.jsonc`
+1. Edit its `[[cursor]]` table in `yazelix_cursors_default.toml` or your local `~/.config/yazelix_cursors/cursors.toml`
 2. Run `yzc generate ghostty` or the Yazelix runtime materialization path to regenerate outputs
 
 ### To create a new preset:
@@ -65,8 +65,8 @@ The build is Rust-owned:
 - Combines `cursor_trail_common.glsl` with Rust-rendered mono/split preset code
 - Outputs complete shaders ready for Ghostty to use
 - Does not require Nushell
-- Honors `settings.glow = none | low | medium | high` from `settings.jsonc`
-- Honors `settings.duration = 0.25..4.0` from `settings.jsonc` as a multiplier for movement-trail timing
+- Honors `settings.glow = none | low | medium | high` from `cursors.toml`
+- Honors `settings.duration = 0.25..4.0` from `cursors.toml` as a multiplier for movement-trail timing
 
 ## Important Notes
 

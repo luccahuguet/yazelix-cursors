@@ -44,7 +44,7 @@ Day-to-day commands:
 yzc list
 yzc list-targets
 yzc inspect
-$EDITOR ~/.config/yazelix_cursors/settings.jsonc
+$EDITOR ~/.config/yazelix_cursors/cursors.toml
 yzc generate ghostty
 ```
 
@@ -60,11 +60,13 @@ directory.
 
 ## Configuration
 
-The standalone config still lives at the existing compatibility path:
+The standalone config lives at:
 
 ```text
-~/.config/yazelix_cursors/settings.jsonc
+~/.config/yazelix_cursors/cursors.toml
 ```
+
+On first use, `yzc` imports a legacy `settings.jsonc` only when `cursors.toml` is absent, writes a timestamped backup first, and uses only TOML afterward
 
 The generated Ghostty include lives at:
 
@@ -132,6 +134,7 @@ The crate must not depend on:
 - Rust crate: `yazelix_cursors`
 - Nix output: `yazelix_cursors`
 - Config directory: `~/.config/yazelix_cursors`
+- Config file: `~/.config/yazelix_cursors/cursors.toml`
 - Integrated Yazelix command: `yzx cursors`
 
 ## Verification

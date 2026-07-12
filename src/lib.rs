@@ -1,4 +1,5 @@
 //! Reusable Yazelix cursor registry and Ghostty shader generation.
+// Test lane: default
 
 use ratconfig::migration::{MigrationError, MigrationMutation, MigrationOp, apply_migrations_text};
 use serde::{Deserialize, Serialize};
@@ -12,8 +13,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_cursors_default.toml";
+pub const DEFAULT_CURSOR_CONFIG_TEMPLATE: &str = include_str!("../yazelix_cursors_default.toml");
 pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
-pub const STANDALONE_CURSOR_SETTINGS_FILENAME: &str = "settings.jsonc";
+pub const STANDALONE_CURSOR_CONFIG_FILENAME: &str = "cursors.toml";
+pub const LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME: &str = "settings.jsonc";
 pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
 pub const GHOSTTY_TRAIL_DURATION_MAX: f64 = 4.0;
@@ -377,6 +380,149 @@ pub fn load_cursor_settings_jsonc(
     parse_cursor_settings_jsonc_text(path, &raw)
 }
 
+pub fn load_cursor_config(path: &Path) -> Result<CursorRegistry, CursorError> {
+    let raw = fs::read_to_string(path).map_err(|source| {
+        CursorError::io(
+            "read_cursor_config_toml",
+            "Could not read Yazelix cursor config",
+            "Run `yzc init`, or restore cursors.toml, then retry.",
+            path.to_string_lossy(),
+            source,
+        )
+    })?;
+    CursorRegistry::parse_str(path, &raw)
+}
+
+pub fn initialize_cursor_config(path: &Path) -> Result<bool, CursorError> {
+    if path_entry_exists(path)? {
+        return Ok(false);
+    }
+    CursorRegistry::parse_str(path, DEFAULT_CURSOR_CONFIG_TEMPLATE)?;
+    write_cursor_config_atomic(path, DEFAULT_CURSOR_CONFIG_TEMPLATE)?;
+    Ok(true)
+}
+
+pub fn import_cursor_settings_jsonc(
+    legacy_path: &Path,
+    config_path: &Path,
+) -> Result<PathBuf, CursorError> {
+    if path_entry_exists(config_path)? {
+        return Err(CursorError::classified(
+            CursorErrorClass::Config,
+            "cursor_config_import_target_exists",
+            format!(
+                "Refusing to replace existing cursor config at {}.",
+                config_path.display()
+            ),
+            "Keep cursors.toml as the active config, or move it aside before importing settings.jsonc.",
+            json!({ "path": config_path.display().to_string() }),
+        ));
+    }
+    if fs::metadata(legacy_path)
+        .map_err(|source| {
+            CursorError::io(
+                "read_legacy_cursor_settings_metadata",
+                "Could not inspect legacy Yazelix cursor settings",
+                "Restore settings.jsonc or move it aside, then retry.",
+                legacy_path.to_string_lossy(),
+                source,
+            )
+        })?
+        .permissions()
+        .readonly()
+    {
+        return Err(CursorError::classified(
+            CursorErrorClass::Config,
+            "read_only_legacy_cursor_settings",
+            format!(
+                "Legacy cursor settings are read-only at {}.",
+                legacy_path.display()
+            ),
+            "Make settings.jsonc writable or copy it to a writable Yazelix Cursors config directory, then retry.",
+            json!({ "path": legacy_path.display().to_string() }),
+        ));
+    }
+
+    let raw = fs::read_to_string(legacy_path).map_err(|source| {
+        CursorError::io(
+            "read_legacy_cursor_settings_jsonc",
+            "Could not read legacy Yazelix cursor settings.jsonc",
+            "Restore settings.jsonc or move it aside, then retry.",
+            legacy_path.to_string_lossy(),
+            source,
+        )
+    })?;
+    let migration = migrate_cursor_settings_jsonc_text(legacy_path, &raw)?;
+    let value = parse_jsonc_value(legacy_path, &migration.text)?;
+    CursorRegistry::parse_json_value(legacy_path, value.clone())?;
+    let rendered = toml::to_string_pretty(&value).map_err(|source| {
+        CursorError::classified(
+            CursorErrorClass::Internal,
+            "render_imported_cursor_config_toml",
+            "Could not render imported cursor settings as TOML.",
+            "Report this Yazelix Cursors bug.",
+            json!({ "error": source.to_string() }),
+        )
+    })?;
+    CursorRegistry::parse_str(config_path, &rendered)?;
+
+    let backup_path = cursor_settings_backup_path(legacy_path);
+    fs::copy(legacy_path, &backup_path).map_err(|source| {
+        cursor_config_io(
+            "backup_cursor_settings_jsonc_before_import",
+            "Could not back up legacy Yazelix cursor settings.jsonc before import",
+            &backup_path,
+            source,
+        )
+    })?;
+    write_cursor_config_atomic(config_path, &rendered)?;
+    Ok(backup_path)
+}
+
+fn path_entry_exists(path: &Path) -> Result<bool, CursorError> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => Ok(true),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(source) => Err(cursor_config_io(
+            "inspect_cursor_config_path",
+            "Could not inspect the Yazelix cursor config path",
+            path,
+            source,
+        )),
+    }
+}
+
+fn write_cursor_config_atomic(path: &Path, raw: &str) -> Result<(), CursorError> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent).map_err(|source| {
+        cursor_config_io(
+            "create_cursor_config_dir",
+            "Could not create the Yazelix cursor config directory",
+            parent,
+            source,
+        )
+    })?;
+    let temp_path = cursor_settings_temp_path(path);
+    fs::write(&temp_path, raw).map_err(|source| {
+        cursor_config_io(
+            "write_cursor_config_temp",
+            "Could not write temporary Yazelix cursor config",
+            &temp_path,
+            source,
+        )
+    })?;
+    if let Err(source) = fs::rename(&temp_path, path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(cursor_config_io(
+            "replace_cursor_config_toml",
+            "Could not install the Yazelix cursor config",
+            path,
+            source,
+        ));
+    }
+    Ok(())
+}
+
 pub fn persist_migrated_cursor_settings_jsonc(
     path: &Path,
     migration: &CursorSettingsMigration,
@@ -418,6 +564,16 @@ pub fn persist_migrated_cursor_settings_jsonc(
     }
 
     Ok(Some(backup_path))
+}
+
+fn cursor_config_io(code: &str, message: &str, path: &Path, source: io::Error) -> CursorError {
+    CursorError::io(
+        code,
+        message,
+        "Check permissions for the cursor config directory and retry.",
+        path.to_string_lossy(),
+        source,
+    )
 }
 
 fn transform_enabled_cursors_without_retired(value: &Value) -> Result<Option<Value>, String> {
@@ -506,9 +662,7 @@ fn cursor_config_references_retired_cursor(value: &Value) -> bool {
 }
 
 fn cursor_definition_is_retired(value: &Value) -> bool {
-    value
-        .get("name")
-        .is_some_and(|name| value_is_retired_cursor_name(name))
+    value.get("name").is_some_and(value_is_retired_cursor_name)
         || value
             .get("family")
             .is_some_and(|family| value_matches_cursor_name(family, RETIRED_CURSOR_FAMILY))
@@ -573,7 +727,7 @@ fn cursor_settings_temp_path(path: &Path) -> PathBuf {
 fn cursor_settings_file_name(path: &Path) -> String {
     path.file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or(STANDALONE_CURSOR_SETTINGS_FILENAME)
+        .unwrap_or(LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME)
         .to_string()
 }
 
@@ -706,7 +860,7 @@ impl CursorRegistry {
     }
 
     pub fn parse_str(path: &Path, raw: &str) -> Result<Self, CursorError> {
-        let parsed = toml::from_str::<RawCursorRegistry>(&raw).map_err(|source| {
+        let parsed = toml::from_str::<RawCursorRegistry>(raw).map_err(|source| {
             CursorError::toml(
                 "invalid_cursor_config_toml",
                 "Could not parse Yazelix cursor config",
@@ -1901,9 +2055,34 @@ mod tests {
         (temp, path)
     }
 
-    fn load_registry(path: &Path) -> Result<CursorRegistry, CursorError> {
-        let raw = fs::read_to_string(path).unwrap();
-        CursorRegistry::parse_str(path, &raw)
+    // Defends: the TOML cutover backs up legacy state and preserves ordered settings plus custom definitions in the sole normal config.
+    #[test]
+    fn imports_legacy_jsonc_into_loadable_toml() {
+        let temp = tempdir().unwrap();
+        let legacy = temp.path().join("settings.jsonc");
+        let config = temp.path().join("nested/cursors.toml");
+        let raw = r##"{
+  // user-owned cursor order and definition
+  "schema_version": 1,
+  "enabled_cursors": ["local_split", "blaze"],
+  "settings": { "trail": "local_split", "trail_effect": "sweep", "mode_effect": "none", "glow": "high", "duration": 1.5, "kitty_enable_cursor": false },
+  "cursor": [
+    { "name": "local_split", "family": "split", "colors": ["#112233", "#aabbcc"], "divider": "horizontal", "transition": "hard", "cursor_color": "#aabbcc" },
+    { "name": "blaze", "family": "mono", "color": "#ffb929" }
+  ]
+}
+"##;
+        let expected = parse_cursor_settings_jsonc_text(&legacy, raw).unwrap().0;
+        fs::write(&legacy, raw).unwrap();
+
+        let backup = import_cursor_settings_jsonc(&legacy, &config).unwrap();
+        let registry = load_cursor_config(&config).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(backup).unwrap(),
+            fs::read_to_string(&legacy).unwrap()
+        );
+        assert_eq!(registry, expected);
     }
 
     fn copy_packaged_shader_sources(destination: &Path) {
@@ -2018,7 +2197,7 @@ color = "#ffb929"
     #[test]
     fn registry_resolves_random_from_enabled_cursors() {
         let (_temp, path) = write_registry(&base_registry(""));
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
 
         let resolved = registry.resolve_with_entropy(51);
 
@@ -2036,7 +2215,7 @@ color = "#ffb929"
     #[test]
     fn random_cursor_resolution_skips_snow_for_light_safe_appearances() {
         let (_temp, path) = write_registry(&snow_random_registry("random"));
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
 
         assert_eq!(
             registry
@@ -2069,7 +2248,7 @@ color = "#ffb929"
     #[test]
     fn explicit_snow_cursor_selection_is_not_filtered_by_light_mode() {
         let (_temp, path) = write_registry(&snow_random_registry("snow"));
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
 
         assert_eq!(
             registry
@@ -2087,7 +2266,7 @@ color = "#ffb929"
     fn registry_derives_mono_accent_and_cursor_color() {
         let (_temp, path) = write_registry(&base_registry(""));
 
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
         let blaze = registry.definitions.get("blaze").unwrap();
 
         assert_eq!(blaze.family, CursorFamily::Mono);
@@ -2108,7 +2287,7 @@ cursor_color = "#00ff66"
 "##,
         ));
 
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
         let blaze = registry.definitions.get("blaze").unwrap();
 
         assert_eq!(blaze.colors[1].hex, "#ff0000");
@@ -2131,7 +2310,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         );
         let (_temp, path) = write_registry(&raw);
 
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
         let blaze = registry.definitions.get("blaze").unwrap();
 
         assert_eq!(blaze.family, CursorFamily::Split);
@@ -2148,7 +2327,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         raw = raw.replace("kitty_enable_cursor = true", "kitty_enable_cursor = false");
         let (_temp, path) = write_registry(&raw);
 
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
 
         assert!(!registry.settings.kitty_enable_cursor);
         assert!(!registry.resolve_with_entropy(0).kitty_enable_cursor);
@@ -2164,7 +2343,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         );
         let (_temp, path) = write_registry(&raw);
 
-        let error = load_registry(&path).unwrap_err();
+        let error = load_cursor_config(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config");
         assert!(format!("{error:?}").contains("enabled_cursors"));
@@ -2184,7 +2363,7 @@ color = "#ffffff"
         );
         let (_temp, path) = write_registry(&raw);
 
-        let error = load_registry(&path).unwrap_err();
+        let error = load_cursor_config(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config");
         assert!(format!("{error:?}").contains("defined more than once"));
@@ -2197,7 +2376,7 @@ color = "#ffffff"
         let raw = base_registry("").replace("#ffb929", "red");
         let (_temp, path) = write_registry(&raw);
 
-        let error = load_registry(&path).unwrap_err();
+        let error = load_cursor_config(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config");
         assert!(format!("{error:?}").contains("#rrggbb"));
@@ -2210,7 +2389,7 @@ color = "#ffffff"
         let raw = base_registry("").replace("family = \"mono\"", "family = \"simple_dual\"");
         let (_temp, path) = write_registry(&raw);
 
-        let error = load_registry(&path).unwrap_err();
+        let error = load_cursor_config(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config");
         assert!(format!("{error:?}").contains("Expected mono or split"));
@@ -2232,7 +2411,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         );
         let (_temp, path) = write_registry(&raw);
 
-        let error = load_registry(&path).unwrap_err();
+        let error = load_cursor_config(&path).unwrap_err();
 
         assert_eq!(error.code(), "invalid_cursor_config_toml");
     }
@@ -2351,7 +2530,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     #[test]
     fn palette_shader_generation_uses_reusable_cursor_registry_boundary() {
         let (_registry_temp, path) = write_registry(&base_registry(""));
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
         let shader_dir = tempdir().unwrap();
         fs::write(
             shader_dir.path().join("cursor_trail_common.glsl"),
@@ -2374,7 +2553,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     #[test]
     fn palette_shader_generation_applies_rio_tuning_to_every_default_preset() {
         let (_temp, path) = write_registry(include_str!("../yazelix_cursors_default.toml"));
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
         let shader_dir = tempdir().unwrap();
         copy_packaged_shader_sources(shader_dir.path());
 
@@ -2462,7 +2641,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     fn shipped_default_registry_parses_active_cursor_surface() {
         let (_temp, path) = write_registry(include_str!("../yazelix_cursors_default.toml"));
 
-        let registry = load_registry(&path).unwrap();
+        let registry = load_cursor_config(&path).unwrap();
 
         assert!(registry.enabled_cursors.contains(&"blaze".to_string()));
         assert!(registry.enabled_cursors.contains(&"snow".to_string()));

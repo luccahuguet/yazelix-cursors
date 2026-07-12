@@ -3,17 +3,12 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      fenix,
     }:
     let
       systems = [
@@ -27,14 +22,6 @@
       yzcPackage =
         system: pkgs:
         let
-          rustToolchain = fenix.packages.${system}.combine [
-            fenix.packages.${system}.stable.cargo
-            fenix.packages.${system}.stable.rustc
-          ];
-          rustPlatform = pkgs.makeRustPlatform {
-            cargo = rustToolchain;
-            rustc = rustToolchain;
-          };
           source = pkgs.lib.cleanSourceWith {
             name = "yazelix-cursors-source";
             src = ./.;
@@ -49,7 +36,7 @@
               && !pkgs.lib.hasPrefix ".git/" relativePath;
           };
         in
-        rustPlatform.buildRustPackage {
+        pkgs.rustPlatform.buildRustPackage {
           pname = "yazelix-cursors";
           version = "0.1.0";
 
@@ -76,6 +63,7 @@
 
             mkdir -p "$share_dir" "$examples_dir" "$config_dir"
             cp -R ${./assets/ghostty/shaders} "$share_dir/shaders"
+            cp ${./yazelix_cursors_default.toml} "$share_dir/cursors.toml"
 
             "$out/bin/yzc" --config-dir "$config_dir" --share-dir "$share_dir" init
             "$out/bin/yzc" --config-dir "$config_dir" --share-dir "$share_dir" generate ghostty
@@ -141,6 +129,7 @@ EOF
               $share_dir/shaders/cursor_trail_magma.glsl
               $share_dir/shaders/generated_effects/tail.glsl
               $share_dir/shaders/generated_effects/ripple.glsl
+              $share_dir/cursors.toml
               $examples_dir/ghostty_blaze_tail.conf
               $out/bin/yzc
             "
@@ -155,6 +144,7 @@ EOF
             schemaVersion = 1;
             packageName = "yazelix-cursors";
             shareRoot = "share/yazelix/yazelix_cursors";
+            defaultConfig = "share/yazelix/yazelix_cursors/cursors.toml";
             shaderRoot = "share/yazelix/yazelix_cursors/shaders";
             generatedEffectRoot = "share/yazelix/yazelix_cursors/shaders/generated_effects";
             requiredTargets = [

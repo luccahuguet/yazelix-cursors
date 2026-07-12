@@ -1,7 +1,7 @@
 # Yazelix-owned default cursor registry
-# Copied to ~/.config/yazelix_cursors/settings.jsonc on first run
+# Copied to ~/.config/yazelix_cursors/cursors.toml on first run
 #
-# The main ~/.config/yazelix/settings.jsonc does not carry Ghostty cursor settings
+# Yazelix consumers can place this same TOML contract in their own config root
 # Cursor selection, effects, duration, glow, Kitty fallback, and cursor
 # definitions live here
 #
