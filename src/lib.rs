@@ -753,7 +753,6 @@ pub struct CursorSettings {
     pub mode_effect: String,
     pub glow: String,
     pub duration: f64,
-    pub kitty_enable_cursor: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -800,7 +799,6 @@ pub struct ResolvedCursorRegistryState {
     pub selected_mode_effect: Option<String>,
     pub duration: f64,
     pub glow: String,
-    pub kitty_enable_cursor: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -821,7 +819,6 @@ struct RawCursorSettings {
     mode_effect: String,
     glow: String,
     duration: f64,
-    kitty_enable_cursor: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -931,7 +928,6 @@ impl CursorRegistry {
             ),
             duration: self.settings.duration,
             glow: self.settings.glow.clone(),
-            kitty_enable_cursor: self.settings.kitty_enable_cursor,
         }
     }
 
@@ -1161,12 +1157,8 @@ pub fn render_cursor_settings_jsonc(registry: &CursorRegistry) -> String {
     ));
     out.push_str(&format!("    \"glow\": \"{}\",\n", registry.settings.glow));
     out.push_str(&format!(
-        "    \"duration\": {},\n",
+        "    \"duration\": {}\n",
         format_ghostty_trail_duration(registry.settings.duration)
-    ));
-    out.push_str(&format!(
-        "    \"kitty_enable_cursor\": {}\n",
-        registry.settings.kitty_enable_cursor
     ));
     out.push_str("  },\n");
     out.push_str("  \"cursor\": [\n");
@@ -1277,7 +1269,6 @@ fn validate_settings(
         mode_effect,
         glow,
         duration: raw.duration,
-        kitty_enable_cursor: raw.kitty_enable_cursor,
     })
 }
 
@@ -2065,7 +2056,7 @@ mod tests {
   // user-owned cursor order and definition
   "schema_version": 1,
   "enabled_cursors": ["local_split", "blaze"],
-  "settings": { "trail": "local_split", "trail_effect": "sweep", "mode_effect": "none", "glow": "high", "duration": 1.5, "kitty_enable_cursor": false },
+  "settings": { "trail": "local_split", "trail_effect": "sweep", "mode_effect": "none", "glow": "high", "duration": 1.5 },
   "cursor": [
     { "name": "local_split", "family": "split", "colors": ["#112233", "#aabbcc"], "divider": "horizontal", "transition": "hard", "cursor_color": "#aabbcc" },
     { "name": "blaze", "family": "mono", "color": "#ffb929" }
@@ -2110,7 +2101,6 @@ trail_effect = "random"
 mode_effect = "random"
 glow = "medium"
 duration = 1.0
-kitty_enable_cursor = true
 
 [[cursor]]
 name = "blaze"
@@ -2133,7 +2123,6 @@ trail_effect = "tail"
 mode_effect = "ripple"
 glow = "medium"
 duration = 1.0
-kitty_enable_cursor = true
 
 [[cursor]]
 name = "snow"
@@ -2207,7 +2196,6 @@ color = "#ffb929"
             resolved.selected_mode_effect,
             Some("ripple_rectangle".to_string())
         );
-        assert!(resolved.kitty_enable_cursor);
     }
 
     // Regression: light and auto appearance keep the configured random pool but skip snow when another cursor is available.
@@ -2319,20 +2307,6 @@ colors = ["#ff1600", "#2a3340"]"##,
         assert_eq!(blaze.cursor_color.hex, "#ff1600");
     }
 
-    // Defends: disabled Kitty cursor fallback remains a first-class sidecar setting independent of Ghostty shader selection.
-    // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
-    #[test]
-    fn registry_parses_kitty_enable_cursor_as_binary_setting() {
-        let mut raw = base_registry("");
-        raw = raw.replace("kitty_enable_cursor = true", "kitty_enable_cursor = false");
-        let (_temp, path) = write_registry(&raw);
-
-        let registry = load_cursor_config(&path).unwrap();
-
-        assert!(!registry.settings.kitty_enable_cursor);
-        assert!(!registry.resolve_with_entropy(0).kitty_enable_cursor);
-    }
-
     // Defends: enabled_cursors must resolve exactly once to a cursor definition.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
@@ -2427,8 +2401,7 @@ colors = ["#ff1600", "#2a3340"]"##,
     "trail_effect": "tail",
     "mode_effect": "ripple",
     "glow": "medium",
-    "duration": 1.0,
-    "kitty_enable_cursor": true
+    "duration": 1.0
   }},
   "cursor": [
     {{

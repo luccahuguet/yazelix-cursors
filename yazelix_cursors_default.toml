@@ -51,9 +51,6 @@ glow = "medium"
 # Duration multiplier for cursor movement trails
 duration = 1.0
 
-# Kitty can only use a simple cursor-trail fallback
-kitty_enable_cursor = true
-
 # Code-owned families
 # Users pick a family; they do not define raw GLSL
 # Expected color fields:
