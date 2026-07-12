@@ -1,5 +1,5 @@
 # Yazelix-owned default cursor registry
-# Copied to ~/.config/yazelix_cursors/cursors.toml on first run
+# Copied into the consuming runtime's config root on first use
 #
 # Yazelix consumers can place this same TOML contract in their own config root
 # Cursor selection, effects, duration, glow, and cursor definitions live here
