@@ -32,18 +32,18 @@ enabled_cursors = [
 [settings]
 # Cursor palette selector
 # Use a name from enabled_cursors, "random", or "none"
-# "random" picks one cursor from enabled_cursors for each Yazelix Ghostty window
+# Consumers resolve "random" from enabled_cursors on their own lifecycle
 trail = "random"
 
-# Tail effect for Ghostty cursor movement
+# Cursor movement effect for compatible consumers
 # Options: "tail", "warp", "sweep", "random", or "none"
 trail_effect = "random"
 
-# Mode-change effect for editor cursor mode changes
+# Cursor mode-change effect for compatible consumers
 # Options: "ripple", "sonic_boom", "rectangle_boom", "ripple_rectangle", "random", or "none"
 mode_effect = "random"
 
-# Glow around Ghostty cursor trails and related cursor effects
+# Glow around cursor trails and related effects for compatible consumers
 # Options: "none", "low", "medium", or "high"
 glow = "medium"
 
