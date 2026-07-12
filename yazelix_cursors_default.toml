@@ -2,8 +2,7 @@
 # Copied to ~/.config/yazelix_cursors/cursors.toml on first run
 #
 # Yazelix consumers can place this same TOML contract in their own config root
-# Cursor selection, effects, duration, glow, Kitty fallback, and cursor
-# definitions live here
+# Cursor selection, effects, duration, glow, and cursor definitions live here
 #
 # enabled_cursors is the source of truth for what can be selected
 # Comment out names to disable cursors, reorder names to influence
