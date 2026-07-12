@@ -21,10 +21,10 @@ pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
 pub const GHOSTTY_TRAIL_DURATION_MAX: f64 = 4.0;
 
-const SUPPORTED_TRAIL_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
-const SUPPORTED_MODE_EFFECTS: &[&str] =
+pub const SUPPORTED_TRAIL_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
+pub const SUPPORTED_MODE_EFFECTS: &[&str] =
     &["ripple", "sonic_boom", "rectangle_boom", "ripple_rectangle"];
-const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
+pub const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
 const LIGHT_RANDOM_EXCLUDED_CURSOR_NAMES: &[&str] = &["snow"];
 const REMOVED_CURSOR_NAMES: &[&str] = &["party", RETIRED_CURSOR_NAME];
 const RETIRED_CURSOR_NAME: &str = "neon";
