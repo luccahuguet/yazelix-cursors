@@ -41,12 +41,7 @@
           version = "0.1.0";
 
           src = source;
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-            outputHashes = {
-              "ratconfig-2.0.0" = "sha256-NXnn7WOBEa7uQl8rs52gpIhpEGTeanRL5+au9ltjQyE=";
-            };
-          };
+          cargoLock.lockFile = ./Cargo.lock;
           cargoBuildFlags = [
             "--bin"
             "yzc"
@@ -65,7 +60,7 @@
             cp -R ${./assets/ghostty/shaders} "$share_dir/shaders"
             cp ${./yazelix_cursors_default.toml} "$share_dir/cursors.toml"
 
-            "$out/bin/yzc" --config-dir "$config_dir" --share-dir "$share_dir" init
+            "$out/bin/yzc" --config-dir "$config_dir" init
             "$out/bin/yzc" --config-dir "$config_dir" --share-dir "$share_dir" generate ghostty
 
             chmod -R u+w "$share_dir/shaders"

@@ -66,7 +66,7 @@ The standalone config lives at:
 ~/.config/yazelix_cursors/cursors.toml
 ```
 
-On first use, `yzc` imports a legacy `settings.jsonc` only when `cursors.toml` is absent, writes a timestamped backup first, and uses only TOML afterward
+`yzc init` creates this TOML file when it is absent and preserves an existing file
 
 The generated Ghostty include lives at:
 

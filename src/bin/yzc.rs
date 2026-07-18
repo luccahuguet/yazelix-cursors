@@ -6,11 +6,10 @@ use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 use yazelix_cursors::{
     CursorDefinition, CursorError, CursorErrorClass, CursorFamily, CursorRegistry,
-    LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME, ResolvedCursorRegistryState,
-    STANDALONE_CURSOR_CONFIG_DIR_NAME, STANDALONE_CURSOR_CONFIG_FILENAME, SplitDivider,
-    cursor_target_contracts, format_ghostty_trail_duration, import_cursor_settings_jsonc,
-    initialize_cursor_config, load_cursor_config, write_ghostty_cursor_effect_shaders,
-    write_ghostty_cursor_palette_shaders,
+    ResolvedCursorRegistryState, STANDALONE_CURSOR_CONFIG_DIR_NAME,
+    STANDALONE_CURSOR_CONFIG_FILENAME, SplitDivider, cursor_target_contracts,
+    format_ghostty_trail_duration, initialize_cursor_config, load_cursor_config,
+    write_ghostty_cursor_effect_shaders, write_ghostty_cursor_palette_shaders,
 };
 
 const GHOSTTY_INCLUDE_FILE_NAME: &str = "ghostty.conf";
@@ -52,7 +51,6 @@ enum CurrentFormat {
 struct Paths {
     config_dir: PathBuf,
     config_path: PathBuf,
-    legacy_config_path: PathBuf,
     ghostty_include_path: PathBuf,
     shaders_path: PathBuf,
 }
@@ -222,15 +220,6 @@ fn run_init(cli: &Cli) -> Result<(), CursorError> {
         )
     })?;
 
-    if !paths.config_path.exists() && paths.legacy_config_path.exists() {
-        let backup = import_cursor_settings_jsonc(&paths.legacy_config_path, &paths.config_path)?;
-        println!(
-            "imported {} (backup: {})",
-            paths.config_path.display(),
-            backup.display()
-        );
-        return Ok(());
-    }
     if !initialize_cursor_config(&paths.config_path)? {
         println!(
             "cursors.toml already exists: {}",
@@ -245,7 +234,7 @@ fn run_init(cli: &Cli) -> Result<(), CursorError> {
 
 fn run_list(cli: &Cli) -> Result<(), CursorError> {
     let paths = paths(&cli.config_dir);
-    let registry = load_standalone_registry(&paths)?;
+    let registry = load_cursor_config(&paths.config_path)?;
 
     println!("Yazelix cursors");
     println!("Config: {}", paths.config_path.display());
@@ -278,13 +267,13 @@ fn run_inspect(cli: &Cli) -> Result<(), CursorError> {
         Err(error) => println!("Packaged shaders: unavailable ({})", error.message()),
     }
 
-    if !standalone_config_available(&paths) {
+    if !paths.config_path.exists() {
         println!("Status: missing config");
         println!("Next: yzc init");
         return Ok(());
     }
 
-    let registry = load_standalone_registry(&paths)?;
+    let registry = load_cursor_config(&paths.config_path)?;
     let resolved = registry.resolve();
     println!("Status: config ok");
     println!(
@@ -301,12 +290,12 @@ fn run_inspect(cli: &Cli) -> Result<(), CursorError> {
 
 fn run_current(cli: &Cli, format: CurrentFormat) -> Result<(), CursorError> {
     let paths = paths(&cli.config_dir);
-    if !standalone_config_available(&paths) {
+    if !paths.config_path.exists() {
         print_current_cursor(None, format);
         return Ok(());
     }
 
-    let registry = load_standalone_registry(&paths)?;
+    let registry = load_cursor_config(&paths.config_path)?;
     let resolved = registry.resolve();
     print_current_cursor(resolved.selected_cursor.as_ref(), format);
     Ok(())
@@ -376,7 +365,7 @@ fn run_generate_ghostty(cli: &Cli) -> Result<(), CursorError> {
         ));
     }
 
-    let registry = load_standalone_registry(&paths)?;
+    let registry = load_cursor_config(&paths.config_path)?;
     let resolved = registry.resolve();
     fs::create_dir_all(&paths.config_dir).map_err(|source| {
         CursorError::io(
@@ -442,8 +431,8 @@ fn run_materialize_rio_compatible_config(
     })?;
 
     let paths = paths(&cli.config_dir);
-    let selected_cursor = if standalone_config_available(&paths) {
-        let registry = load_standalone_registry(&paths)?;
+    let selected_cursor = if paths.config_path.exists() {
+        let registry = load_cursor_config(&paths.config_path)?;
         registry.resolve().selected_cursor
     } else {
         None
@@ -528,11 +517,11 @@ fn print_help() {
     println!("Yazelix Cursors");
     println!();
     println!("Usage:");
-    println!("  yzc [--config-dir <dir>] [--share-dir <dir>] init");
-    println!("  yzc [--config-dir <dir>] [--share-dir <dir>] list");
+    println!("  yzc [--config-dir <dir>] init");
+    println!("  yzc [--config-dir <dir>] list");
     println!("  yzc list-targets");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] inspect");
-    println!("  yzc [--config-dir <dir>] [--share-dir <dir>] current [--format env|json]");
+    println!("  yzc [--config-dir <dir>] current [--format env|json]");
     println!("  yzc [--config-dir <dir>] [--share-dir <dir>] generate ghostty");
     println!(
         "  yzc [--config-dir <dir>] materialize rio-compatible-config --source-config <path> [--output-root <dir>]"
@@ -550,7 +539,6 @@ fn paths(config_dir: &Path) -> Paths {
     Paths {
         config_dir: config_dir.to_path_buf(),
         config_path: config_dir.join(STANDALONE_CURSOR_CONFIG_FILENAME),
-        legacy_config_path: config_dir.join(LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME),
         ghostty_include_path: config_dir.join(GHOSTTY_INCLUDE_FILE_NAME),
         shaders_path: config_dir.join("shaders"),
     }
@@ -572,22 +560,6 @@ fn default_config_dir() -> Result<PathBuf, CursorError> {
     Ok(PathBuf::from(home)
         .join(".config")
         .join(STANDALONE_CURSOR_CONFIG_DIR_NAME))
-}
-
-fn load_standalone_registry(paths: &Paths) -> Result<CursorRegistry, CursorError> {
-    if !paths.config_path.exists() && paths.legacy_config_path.exists() {
-        let backup_path =
-            import_cursor_settings_jsonc(&paths.legacy_config_path, &paths.config_path)?;
-        eprintln!(
-            "Imported legacy settings.jsonc into cursors.toml; backup: {}",
-            backup_path.display()
-        );
-    }
-    load_cursor_config(&paths.config_path)
-}
-
-fn standalone_config_available(paths: &Paths) -> bool {
-    paths.config_path.exists() || paths.legacy_config_path.exists()
 }
 
 fn resolve_share_dir(override_dir: Option<&Path>) -> Result<PathBuf, CursorError> {

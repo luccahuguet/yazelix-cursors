@@ -15,12 +15,10 @@ name = "yzc"
 path = "src/bin/yzc.rs"
 
 [dependencies]
-jsonc-parser = { version = "0.32.3", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 toml = "1.1"
-ratconfig = { git = "https://github.com/luccahuguet/ratconfig", rev = "110e749a5fb10e146611427564bd6afda0750827", default-features = false }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

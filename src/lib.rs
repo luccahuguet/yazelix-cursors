@@ -1,7 +1,6 @@
 //! Reusable Yazelix cursor registry and Ghostty shader generation.
 // Test lane: default
 
-use ratconfig::migration::{MigrationError, MigrationMutation, MigrationOp, apply_migrations_text};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -16,7 +15,6 @@ pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_cursors_default.toml";
 pub const DEFAULT_CURSOR_CONFIG_TEMPLATE: &str = include_str!("../yazelix_cursors_default.toml");
 pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
 pub const STANDALONE_CURSOR_CONFIG_FILENAME: &str = "cursors.toml";
-pub const LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME: &str = "settings.jsonc";
 pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
 pub const GHOSTTY_TRAIL_DURATION_MAX: f64 = 4.0;
@@ -28,9 +26,6 @@ pub const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
 const LIGHT_RANDOM_EXCLUDED_CURSOR_NAMES: &[&str] = &["snow"];
 const REMOVED_CURSOR_NAMES: &[&str] = &["party", RETIRED_CURSOR_NAME];
 const RETIRED_CURSOR_NAME: &str = "neon";
-const RETIRED_CURSOR_FAMILY: &str = "curated_template";
-const RETIRED_CURSOR_REPLACEMENT_NAME: &str = "cosmic";
-const RETIRED_CURSOR_REPLACEMENT_COLOR: &str = "#c761f5";
 const GHOSTTY_CURSOR_EFFECT_TEMPLATES: &[(&str, &str)] = &[
     ("tail", "cursor_tail.glsl"),
     ("warp", "cursor_warp.glsl"),
@@ -274,112 +269,6 @@ impl CursorError {
     }
 }
 
-pub fn parse_jsonc_value(path: &Path, raw: &str) -> Result<Value, CursorError> {
-    jsonc_parser::parse_to_serde_value::<Value>(
-        raw,
-        &jsonc_parser::ParseOptions {
-            allow_comments: true,
-            allow_loose_object_property_names: false,
-            allow_trailing_commas: true,
-            allow_missing_commas: false,
-            allow_single_quoted_strings: false,
-            allow_hexadecimal_numbers: false,
-            allow_unary_plus_numbers: false,
-        },
-    )
-    .map_err(|source| {
-        CursorError::classified(
-            CursorErrorClass::Config,
-            "invalid_cursor_settings_jsonc",
-            format!(
-                "Could not parse Yazelix cursor settings JSONC at {}: {source}.",
-                path.display()
-            ),
-            "Fix the JSONC syntax in settings.jsonc and retry. Comments must use `//` or `/* ... */`, not `#`.",
-            json!({
-                "path": path.display().to_string(),
-                "error": source.to_string(),
-            }),
-        )
-    })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CursorSettingsMigration {
-    pub text: String,
-    pub changed_paths: Vec<String>,
-}
-
-impl CursorSettingsMigration {
-    pub fn changed(&self) -> bool {
-        !self.changed_paths.is_empty()
-    }
-}
-
-pub fn migrate_cursor_settings_jsonc_text(
-    path: &Path,
-    raw: &str,
-) -> Result<CursorSettingsMigration, CursorError> {
-    let initial = parse_jsonc_value(path, raw)?;
-    let needs_replacement_definition = cursor_config_references_retired_cursor(&initial);
-    let mut operations = vec![
-        MigrationOp::Transform {
-            path: "enabled_cursors".to_string(),
-            transform: transform_enabled_cursors_without_retired,
-        },
-        MigrationOp::Transform {
-            path: "settings.trail".to_string(),
-            transform: transform_retired_trail_selection,
-        },
-        MigrationOp::Transform {
-            path: "cursor".to_string(),
-            transform: remove_retired_cursor_definitions,
-        },
-    ];
-    if needs_replacement_definition {
-        operations.push(MigrationOp::AddDefault {
-            path: "cursor".to_string(),
-            value: json!([retired_cursor_replacement_definition()]),
-        });
-        operations.push(MigrationOp::Transform {
-            path: "cursor".to_string(),
-            transform: append_replacement_cursor_definition,
-        });
-    }
-
-    let outcome = apply_migrations_text(raw, &operations)
-        .map_err(|source| cursor_settings_migration_error(path, source))?;
-    Ok(CursorSettingsMigration {
-        text: outcome.text,
-        changed_paths: migration_changed_paths(&outcome.mutations),
-    })
-}
-
-pub fn parse_cursor_settings_jsonc_text(
-    path: &Path,
-    raw: &str,
-) -> Result<(CursorRegistry, CursorSettingsMigration), CursorError> {
-    let migration = migrate_cursor_settings_jsonc_text(path, raw)?;
-    let value = parse_jsonc_value(path, &migration.text)?;
-    let registry = CursorRegistry::parse_json_value(path, value)?;
-    Ok((registry, migration))
-}
-
-pub fn load_cursor_settings_jsonc(
-    path: &Path,
-) -> Result<(CursorRegistry, CursorSettingsMigration), CursorError> {
-    let raw = fs::read_to_string(path).map_err(|source| {
-        CursorError::io(
-            "read_cursor_settings_jsonc",
-            "Could not read Yazelix cursor settings.jsonc",
-            "Run `yzc init`, or restore ~/.config/yazelix_cursors/settings.jsonc, then retry.",
-            path.to_string_lossy(),
-            source,
-        )
-    })?;
-    parse_cursor_settings_jsonc_text(path, &raw)
-}
-
 pub fn load_cursor_config(path: &Path) -> Result<CursorRegistry, CursorError> {
     let raw = fs::read_to_string(path).map_err(|source| {
         CursorError::io(
@@ -402,83 +291,6 @@ pub fn initialize_cursor_config(path: &Path) -> Result<bool, CursorError> {
     Ok(true)
 }
 
-pub fn import_cursor_settings_jsonc(
-    legacy_path: &Path,
-    config_path: &Path,
-) -> Result<PathBuf, CursorError> {
-    if path_entry_exists(config_path)? {
-        return Err(CursorError::classified(
-            CursorErrorClass::Config,
-            "cursor_config_import_target_exists",
-            format!(
-                "Refusing to replace existing cursor config at {}.",
-                config_path.display()
-            ),
-            "Keep cursors.toml as the active config, or move it aside before importing settings.jsonc.",
-            json!({ "path": config_path.display().to_string() }),
-        ));
-    }
-    if fs::metadata(legacy_path)
-        .map_err(|source| {
-            CursorError::io(
-                "read_legacy_cursor_settings_metadata",
-                "Could not inspect legacy Yazelix cursor settings",
-                "Restore settings.jsonc or move it aside, then retry.",
-                legacy_path.to_string_lossy(),
-                source,
-            )
-        })?
-        .permissions()
-        .readonly()
-    {
-        return Err(CursorError::classified(
-            CursorErrorClass::Config,
-            "read_only_legacy_cursor_settings",
-            format!(
-                "Legacy cursor settings are read-only at {}.",
-                legacy_path.display()
-            ),
-            "Make settings.jsonc writable or copy it to a writable Yazelix Cursors config directory, then retry.",
-            json!({ "path": legacy_path.display().to_string() }),
-        ));
-    }
-
-    let raw = fs::read_to_string(legacy_path).map_err(|source| {
-        CursorError::io(
-            "read_legacy_cursor_settings_jsonc",
-            "Could not read legacy Yazelix cursor settings.jsonc",
-            "Restore settings.jsonc or move it aside, then retry.",
-            legacy_path.to_string_lossy(),
-            source,
-        )
-    })?;
-    let migration = migrate_cursor_settings_jsonc_text(legacy_path, &raw)?;
-    let value = parse_jsonc_value(legacy_path, &migration.text)?;
-    CursorRegistry::parse_json_value(legacy_path, value.clone())?;
-    let rendered = toml::to_string_pretty(&value).map_err(|source| {
-        CursorError::classified(
-            CursorErrorClass::Internal,
-            "render_imported_cursor_config_toml",
-            "Could not render imported cursor settings as TOML.",
-            "Report this Yazelix Cursors bug.",
-            json!({ "error": source.to_string() }),
-        )
-    })?;
-    CursorRegistry::parse_str(config_path, &rendered)?;
-
-    let backup_path = cursor_settings_backup_path(legacy_path);
-    fs::copy(legacy_path, &backup_path).map_err(|source| {
-        cursor_config_io(
-            "backup_cursor_settings_jsonc_before_import",
-            "Could not back up legacy Yazelix cursor settings.jsonc before import",
-            &backup_path,
-            source,
-        )
-    })?;
-    write_cursor_config_atomic(config_path, &rendered)?;
-    Ok(backup_path)
-}
-
 fn path_entry_exists(path: &Path) -> Result<bool, CursorError> {
     match fs::symlink_metadata(path) {
         Ok(_) => Ok(true),
@@ -493,7 +305,10 @@ fn path_entry_exists(path: &Path) -> Result<bool, CursorError> {
 }
 
 fn write_cursor_config_atomic(path: &Path, raw: &str) -> Result<(), CursorError> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     fs::create_dir_all(parent).map_err(|source| {
         cursor_config_io(
             "create_cursor_config_dir",
@@ -502,7 +317,7 @@ fn write_cursor_config_atomic(path: &Path, raw: &str) -> Result<(), CursorError>
             source,
         )
     })?;
-    let temp_path = cursor_settings_temp_path(path);
+    let temp_path = cursor_config_temp_path(path);
     fs::write(&temp_path, raw).map_err(|source| {
         cursor_config_io(
             "write_cursor_config_temp",
@@ -523,49 +338,6 @@ fn write_cursor_config_atomic(path: &Path, raw: &str) -> Result<(), CursorError>
     Ok(())
 }
 
-pub fn persist_migrated_cursor_settings_jsonc(
-    path: &Path,
-    migration: &CursorSettingsMigration,
-) -> Result<Option<PathBuf>, CursorError> {
-    if !migration.changed() {
-        return Ok(None);
-    }
-
-    let backup_path = cursor_settings_backup_path(path);
-    fs::copy(path, &backup_path).map_err(|source| {
-        CursorError::io(
-            "backup_cursor_settings_jsonc_before_migration",
-            "Could not back up Yazelix cursor settings.jsonc before migration",
-            "Check permissions for ~/.config/yazelix_cursors and retry.",
-            backup_path.to_string_lossy(),
-            source,
-        )
-    })?;
-
-    let temp_path = cursor_settings_temp_path(path);
-    fs::write(&temp_path, &migration.text).map_err(|source| {
-        CursorError::io(
-            "write_migrated_cursor_settings_jsonc",
-            "Could not write migrated Yazelix cursor settings.jsonc",
-            "Check permissions for ~/.config/yazelix_cursors and retry.",
-            temp_path.to_string_lossy(),
-            source,
-        )
-    })?;
-    if let Err(source) = fs::rename(&temp_path, path) {
-        let _ = fs::remove_file(&temp_path);
-        return Err(CursorError::io(
-            "replace_migrated_cursor_settings_jsonc",
-            "Could not replace Yazelix cursor settings.jsonc with the migrated version",
-            "Check permissions for ~/.config/yazelix_cursors and retry.",
-            path.to_string_lossy(),
-            source,
-        ));
-    }
-
-    Ok(Some(backup_path))
-}
-
 fn cursor_config_io(code: &str, message: &str, path: &Path, source: io::Error) -> CursorError {
     CursorError::io(
         code,
@@ -576,162 +348,19 @@ fn cursor_config_io(code: &str, message: &str, path: &Path, source: io::Error) -
     )
 }
 
-fn transform_enabled_cursors_without_retired(value: &Value) -> Result<Option<Value>, String> {
-    let Some(items) = value.as_array() else {
-        return Ok(None);
-    };
-    let mut removed = false;
-    let mut kept = Vec::new();
-    for item in items {
-        if value_is_retired_cursor_name(item) {
-            removed = true;
-        } else {
-            kept.push(item.clone());
-        }
-    }
-    if !removed {
-        return Ok(None);
-    }
-    if kept.is_empty() {
-        kept.push(json!(RETIRED_CURSOR_REPLACEMENT_NAME));
-    }
-    Ok(Some(Value::Array(kept)))
-}
-
-fn transform_retired_trail_selection(value: &Value) -> Result<Option<Value>, String> {
-    if value_is_retired_cursor_name(value) {
-        Ok(Some(json!(RETIRED_CURSOR_REPLACEMENT_NAME)))
-    } else {
-        Ok(None)
-    }
-}
-
-fn remove_retired_cursor_definitions(value: &Value) -> Result<Option<Value>, String> {
-    let Some(definitions) = value.as_array() else {
-        return Ok(None);
-    };
-    let kept = definitions
-        .iter()
-        .filter(|definition| !cursor_definition_is_retired(definition))
-        .cloned()
-        .collect::<Vec<_>>();
-    if kept.len() == definitions.len() {
-        Ok(None)
-    } else {
-        Ok(Some(Value::Array(kept)))
-    }
-}
-
-fn append_replacement_cursor_definition(value: &Value) -> Result<Option<Value>, String> {
-    let Some(definitions) = value.as_array() else {
-        return Ok(None);
-    };
-    if definitions.iter().any(|definition| {
-        definition
-            .get("name")
-            .is_some_and(|name| value_matches_cursor_name(name, RETIRED_CURSOR_REPLACEMENT_NAME))
-    }) {
-        return Ok(None);
-    }
-    let mut next = definitions.clone();
-    next.push(retired_cursor_replacement_definition());
-    Ok(Some(Value::Array(next)))
-}
-
-fn retired_cursor_replacement_definition() -> Value {
-    json!({
-        "name": RETIRED_CURSOR_REPLACEMENT_NAME,
-        "family": "mono",
-        "color": RETIRED_CURSOR_REPLACEMENT_COLOR,
-    })
-}
-
-fn cursor_config_references_retired_cursor(value: &Value) -> bool {
-    value
-        .get("enabled_cursors")
-        .and_then(Value::as_array)
-        .is_some_and(|items| items.iter().any(value_is_retired_cursor_name))
-        || value
-            .get("settings")
-            .and_then(|settings| settings.get("trail"))
-            .is_some_and(value_is_retired_cursor_name)
-        || value
-            .get("cursor")
-            .and_then(Value::as_array)
-            .is_some_and(|definitions| definitions.iter().any(cursor_definition_is_retired))
-}
-
-fn cursor_definition_is_retired(value: &Value) -> bool {
-    value.get("name").is_some_and(value_is_retired_cursor_name)
-        || value
-            .get("family")
-            .is_some_and(|family| value_matches_cursor_name(family, RETIRED_CURSOR_FAMILY))
-}
-
-fn value_is_retired_cursor_name(value: &Value) -> bool {
-    value_matches_cursor_name(value, RETIRED_CURSOR_NAME)
-}
-
-fn value_matches_cursor_name(value: &Value, expected: &str) -> bool {
-    value
-        .as_str()
-        .map(|raw| raw.trim().eq_ignore_ascii_case(expected))
-        .unwrap_or(false)
-}
-
-fn migration_changed_paths(mutations: &[MigrationMutation]) -> Vec<String> {
-    mutations
-        .iter()
-        .map(|mutation| match mutation {
-            MigrationMutation::Renamed { from, to } => format!("{from}->{to}"),
-            MigrationMutation::Deleted { path }
-            | MigrationMutation::AddedDefault { path }
-            | MigrationMutation::Transformed { path } => path.clone(),
-        })
-        .collect()
-}
-
-fn cursor_settings_migration_error(path: &Path, source: MigrationError) -> CursorError {
-    CursorError::classified(
-        CursorErrorClass::Config,
-        "migrate_cursor_settings_jsonc",
-        format!(
-            "Could not migrate Yazelix cursor settings JSONC at {}.",
-            path.display()
-        ),
-        "Fix ~/.config/yazelix_cursors/settings.jsonc or move it aside and run `yzc init`.",
-        json!({
-            "path": path.display().to_string(),
-            "error": format!("{source:?}"),
-        }),
-    )
-}
-
-fn cursor_settings_backup_path(path: &Path) -> PathBuf {
-    path.with_file_name(format!(
-        "{}.backup_before_yazelix_cursors_v2_{}",
-        cursor_settings_file_name(path),
-        migration_stamp(),
-    ))
-}
-
-fn cursor_settings_temp_path(path: &Path) -> PathBuf {
-    path.with_file_name(format!(
-        ".{}.tmp_yazelix_cursors_migration_{}_{}",
-        cursor_settings_file_name(path),
-        process::id(),
-        migration_stamp(),
-    ))
-}
-
-fn cursor_settings_file_name(path: &Path) -> String {
-    path.file_name()
+fn cursor_config_temp_path(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or(LEGACY_STANDALONE_CURSOR_SETTINGS_FILENAME)
-        .to_string()
+        .unwrap_or(STANDALONE_CURSOR_CONFIG_FILENAME);
+    path.with_file_name(format!(
+        ".{file_name}.tmp_yazelix_cursors_{}_{}",
+        process::id(),
+        timestamp_nanos(),
+    ))
 }
 
-fn migration_stamp() -> u128 {
+fn timestamp_nanos() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
@@ -837,25 +466,6 @@ struct RawCursorDefinition {
 }
 
 impl CursorRegistry {
-    pub fn parse_json_value(path: &Path, cursors: Value) -> Result<Self, CursorError> {
-        let parsed = serde_json::from_value::<RawCursorRegistry>(cursors).map_err(|source| {
-            CursorError::classified(
-                CursorErrorClass::Config,
-                "invalid_cursor_registry_json",
-                format!(
-                    "Could not parse Yazelix cursor registry JSON in {}.",
-                    path.display()
-                ),
-                "Fix the cursor registry data and retry.",
-                json!({
-                    "path": path.display().to_string(),
-                    "error": source.to_string(),
-                }),
-            )
-        })?;
-        CursorRegistry::from_raw(path, parsed)
-    }
-
     pub fn parse_str(path: &Path, raw: &str) -> Result<Self, CursorError> {
         let parsed = toml::from_str::<RawCursorRegistry>(raw).map_err(|source| {
             CursorError::toml(
@@ -883,11 +493,7 @@ impl CursorRegistry {
     }
 
     pub fn resolve(&self) -> ResolvedCursorRegistryState {
-        let entropy = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos() as usize)
-            .unwrap_or(0);
-        self.resolve_with_entropy(entropy)
+        self.resolve_with_entropy(timestamp_nanos() as usize)
     }
 
     pub fn resolve_with_entropy(&self, entropy: usize) -> ResolvedCursorRegistryState {
@@ -895,11 +501,7 @@ impl CursorRegistry {
     }
 
     pub fn resolve_for_appearance(&self, appearance_mode: &str) -> ResolvedCursorRegistryState {
-        let entropy = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos() as usize)
-            .unwrap_or(0);
-        self.resolve_with_entropy_for_appearance(entropy, appearance_mode)
+        self.resolve_with_entropy_for_appearance(timestamp_nanos() as usize, appearance_mode)
     }
 
     pub fn resolve_with_entropy_for_appearance(
@@ -1120,105 +722,6 @@ impl CursorColor {
             u8::from_str_radix(&self.hex[5..7], 16).unwrap_or(0),
         ]
     }
-}
-
-pub fn render_cursor_settings_jsonc(registry: &CursorRegistry) -> String {
-    let mut out = String::new();
-    out.push_str("// Yazelix Cursors settings\n");
-    out.push_str("// Edit this file through `yzx config ui`, `yzc init`, or your editor.\n");
-    out.push_str("// In Ghostty standalone setups, add: config-file = ~/.config/yazelix_cursors/ghostty.conf\n");
-    out.push_str("{\n");
-    out.push_str(&format!(
-        "  \"schema_version\": {},\n",
-        registry.schema_version
-    ));
-    out.push_str("  \"enabled_cursors\": [\n");
-    for (index, name) in registry.enabled_cursors.iter().enumerate() {
-        let comma = if index + 1 == registry.enabled_cursors.len() {
-            ""
-        } else {
-            ","
-        };
-        out.push_str(&format!("    \"{name}\"{comma}\n"));
-    }
-    out.push_str("  ],\n");
-    out.push_str("  \"settings\": {\n");
-    out.push_str(&format!(
-        "    \"trail\": \"{}\",\n",
-        registry.settings.trail
-    ));
-    out.push_str(&format!(
-        "    \"trail_effect\": \"{}\",\n",
-        registry.settings.trail_effect
-    ));
-    out.push_str(&format!(
-        "    \"mode_effect\": \"{}\",\n",
-        registry.settings.mode_effect
-    ));
-    out.push_str(&format!("    \"glow\": \"{}\",\n", registry.settings.glow));
-    out.push_str(&format!(
-        "    \"duration\": {}\n",
-        format_ghostty_trail_duration(registry.settings.duration)
-    ));
-    out.push_str("  },\n");
-    out.push_str("  \"cursor\": [\n");
-    let definitions = registry.enabled_definitions();
-    for (index, definition) in definitions.iter().enumerate() {
-        let comma = if index + 1 == definitions.len() {
-            ""
-        } else {
-            ","
-        };
-        out.push_str(&render_cursor_definition_jsonc(definition, comma));
-    }
-    out.push_str("  ]\n");
-    out.push_str("}\n");
-    out
-}
-
-fn render_cursor_definition_jsonc(definition: &CursorDefinition, comma: &str) -> String {
-    let mut out = String::new();
-    out.push_str("    {\n");
-    out.push_str(&format!("      \"name\": \"{}\",\n", definition.name));
-    out.push_str(&format!(
-        "      \"family\": \"{}\",\n",
-        definition.family.as_str()
-    ));
-    match definition.family {
-        CursorFamily::Mono => {
-            out.push_str(&format!(
-                "      \"color\": \"{}\",\n",
-                definition.colors[0].hex
-            ));
-            out.push_str(&format!(
-                "      \"accent_color\": \"{}\",\n",
-                definition.colors[1].hex
-            ));
-        }
-        CursorFamily::Split => {
-            let divider = definition
-                .divider
-                .expect("validated split cursor definitions always have a divider");
-            let transition = definition
-                .transition
-                .expect("validated split cursor definitions always have a transition");
-            out.push_str(&format!("      \"divider\": \"{}\",\n", divider.as_str()));
-            out.push_str(&format!(
-                "      \"transition\": \"{}\",\n",
-                transition.as_str()
-            ));
-            out.push_str("      \"colors\": [\n");
-            out.push_str(&format!("        \"{}\",\n", definition.colors[0].hex));
-            out.push_str(&format!("        \"{}\"\n", definition.colors[1].hex));
-            out.push_str("      ],\n");
-        }
-    }
-    out.push_str(&format!(
-        "      \"cursor_color\": \"{}\"\n",
-        definition.cursor_color.hex
-    ));
-    out.push_str(&format!("    }}{comma}\n"));
-    out
 }
 
 fn validate_settings(
@@ -2046,36 +1549,6 @@ mod tests {
         (temp, path)
     }
 
-    // Defends: the TOML cutover backs up legacy state and preserves ordered settings plus custom definitions in the sole normal config.
-    #[test]
-    fn imports_legacy_jsonc_into_loadable_toml() {
-        let temp = tempdir().unwrap();
-        let legacy = temp.path().join("settings.jsonc");
-        let config = temp.path().join("nested/cursors.toml");
-        let raw = r##"{
-  // user-owned cursor order and definition
-  "schema_version": 1,
-  "enabled_cursors": ["local_split", "blaze"],
-  "settings": { "trail": "local_split", "trail_effect": "sweep", "mode_effect": "none", "glow": "high", "duration": 1.5 },
-  "cursor": [
-    { "name": "local_split", "family": "split", "colors": ["#112233", "#aabbcc"], "divider": "horizontal", "transition": "hard", "cursor_color": "#aabbcc" },
-    { "name": "blaze", "family": "mono", "color": "#ffb929" }
-  ]
-}
-"##;
-        let expected = parse_cursor_settings_jsonc_text(&legacy, raw).unwrap().0;
-        fs::write(&legacy, raw).unwrap();
-
-        let backup = import_cursor_settings_jsonc(&legacy, &config).unwrap();
-        let registry = load_cursor_config(&config).unwrap();
-
-        assert_eq!(
-            fs::read_to_string(backup).unwrap(),
-            fs::read_to_string(&legacy).unwrap()
-        );
-        assert_eq!(registry, expected);
-    }
-
     fn copy_packaged_shader_sources(destination: &Path) {
         let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/ghostty/shaders");
         fs::copy(
@@ -2390,115 +1863,7 @@ colors = ["#ff1600", "#2a3340"]"##,
         assert_eq!(error.code(), "invalid_cursor_config_toml");
     }
 
-    fn stale_neon_settings_jsonc(enabled: &str, trail: &str) -> String {
-        format!(
-            r##"{{
-  // stale pre-removal cursor config
-  "schema_version": 1,
-  "enabled_cursors": {enabled},
-  "settings": {{
-    "trail": "{trail}",
-    "trail_effect": "tail",
-    "mode_effect": "ripple",
-    "glow": "medium",
-    "duration": 1.0
-  }},
-  "cursor": [
-    {{
-      "name": "blaze",
-      "family": "mono",
-      "color": "#ffb929"
-    }},
-    {{
-      "name": "neon",
-      "family": "curated_template",
-      "template": "neon",
-      "cursor_color": "#0090ff"
-    }}
-  ]
-}}
-"##
-        )
-    }
-
-    // Regression: stale neon JSONC configs migrate before strict validation so runtime activation does not fail on removed defaults.
-    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
-    #[test]
-    fn cursor_settings_jsonc_migration_removes_retired_neon_entries() {
-        let path = Path::new("settings.jsonc");
-        let raw = stale_neon_settings_jsonc(r#"["blaze", "neon"]"#, "random");
-
-        let (registry, migration) = parse_cursor_settings_jsonc_text(path, &raw).unwrap();
-
-        assert!(migration.changed());
-        assert!(
-            migration
-                .changed_paths
-                .contains(&"enabled_cursors".to_string())
-        );
-        assert!(migration.changed_paths.contains(&"cursor".to_string()));
-        assert!(
-            migration
-                .text
-                .contains("// stale pre-removal cursor config")
-        );
-        assert!(!migration.text.contains("curated_template"));
-        assert!(!migration.text.contains(r#""neon""#));
-        assert_eq!(registry.enabled_cursors, vec!["blaze".to_string()]);
-        assert!(!registry.definitions.contains_key("neon"));
-        assert!(registry.definitions.contains_key("cosmic"));
-    }
-
-    // Regression: a config that selected only retired neon is remapped to the supported cosmic replacement.
-    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
-    #[test]
-    fn cursor_settings_jsonc_migration_replaces_neon_when_it_was_selected() {
-        let path = Path::new("settings.jsonc");
-        let raw = stale_neon_settings_jsonc(r#"["neon"]"#, "neon");
-
-        let (registry, migration) = parse_cursor_settings_jsonc_text(path, &raw).unwrap();
-
-        assert!(
-            migration
-                .changed_paths
-                .contains(&"settings.trail".to_string())
-        );
-        assert_eq!(registry.enabled_cursors, vec!["cosmic".to_string()]);
-        assert_eq!(registry.settings.trail, "cosmic");
-        assert_eq!(
-            registry.definitions.get("cosmic").unwrap().colors[0].hex,
-            RETIRED_CURSOR_REPLACEMENT_COLOR
-        );
-    }
-
-    // Defends: automatic cursor config migrations are durable and backup-first, not one-off local repair steps.
-    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
-    #[test]
-    fn persisted_cursor_settings_jsonc_migration_writes_backup_and_becomes_idempotent() {
-        let temp = tempdir().unwrap();
-        let path = temp.path().join("settings.jsonc");
-        fs::write(&path, stale_neon_settings_jsonc(r#"["neon"]"#, "neon")).unwrap();
-
-        let (registry, migration) = load_cursor_settings_jsonc(&path).unwrap();
-        let backup_path = persist_migrated_cursor_settings_jsonc(&path, &migration)
-            .unwrap()
-            .expect("migration backup path");
-
-        assert_eq!(registry.settings.trail, "cosmic");
-        assert!(backup_path.exists());
-        let migrated = fs::read_to_string(&path).unwrap();
-        assert!(!migrated.contains(r#""neon""#));
-        assert!(
-            fs::read_to_string(backup_path)
-                .unwrap()
-                .contains(r#""neon""#)
-        );
-
-        let (_registry, second_migration) = load_cursor_settings_jsonc(&path).unwrap();
-        assert!(!second_migration.changed());
-    }
-
-    // Defends: the standalone cursor package can generate Ghostty palette shaders from the registry without settings.jsonc or runtime materialization.
+    // Defends: the standalone cursor package can generate Ghostty palette shaders from the TOML registry without runtime materialization.
     // Strength: defect=2 behavior=2 resilience=2 cost=1 uniqueness=2 total=9/10
     #[test]
     fn palette_shader_generation_uses_reusable_cursor_registry_boundary() {

@@ -54,7 +54,7 @@ By default, that writes generated shaders into the standalone cursor config tree
 For an isolated preview, pass explicit config and share roots:
 
 ```bash
-yzc --config-dir /tmp/yazelix_cursor_preview --share-dir <package>/share/yazelix/yazelix_cursors init
+yzc --config-dir /tmp/yazelix_cursor_preview init
 yzc --config-dir /tmp/yazelix_cursor_preview --share-dir <package>/share/yazelix/yazelix_cursors generate ghostty
 ```
 
