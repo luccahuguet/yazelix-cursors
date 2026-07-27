@@ -69,8 +69,9 @@ The standalone config lives at:
 `yzc init` creates this TOML file when it is absent and preserves an existing file
 
 The initialized file is complete and readable on its own. Its six finite
-settings may also be omitted: `yazelix_cursors` resolves missing values from the
-packaged template. Cursor definition tables are not merged or synthesized.
+settings may also be omitted: an absent `enabled_cursors` enables the definitions
+in that file, and the five `[settings]` values inherit from the packaged
+template. Cursor definition tables are not merged or synthesized.
 
 The generated Ghostty include lives at:
 

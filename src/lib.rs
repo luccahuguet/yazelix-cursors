@@ -760,10 +760,26 @@ fn inherit_missing_finite_setting(active: &mut toml::Value, defaults: &toml::Val
         return;
     };
     let Some((section, key)) = path.split_once('.') else {
-        if !active.contains_key(path)
-            && let Some(default) = defaults.get(path)
-        {
-            active.insert(path.to_string(), default.clone());
+        if active.contains_key(path) {
+            return;
+        }
+        let default = if path == "enabled_cursors" {
+            active
+                .get("cursor")
+                .and_then(toml::Value::as_array)
+                .map(|definitions| {
+                    toml::Value::Array(
+                        definitions
+                            .iter()
+                            .filter_map(|definition| definition.get("name").cloned())
+                            .collect(),
+                    )
+                })
+        } else {
+            defaults.get(path).cloned()
+        };
+        if let Some(default) = default {
+            active.insert(path.to_string(), default);
         }
         return;
     };
@@ -1805,6 +1821,30 @@ color = "#ffb929"
         .unwrap();
 
         assert_eq!(resolved, packaged);
+
+        let custom = r##"
+schema_version = 1
+
+[[cursor]]
+name = "custom"
+family = "mono"
+color = "#123456"
+"##;
+        let resolved = CursorRegistry::parse_str(Path::new("custom.toml"), custom).unwrap();
+        assert_eq!(resolved.enabled_cursors, ["custom"]);
+        assert_eq!(resolved.settings.trail, "random");
+        assert_eq!(resolved.settings.trail_effect, "random");
+        assert_eq!(resolved.settings.mode_effect, "random");
+        assert_eq!(resolved.settings.glow, "medium");
+        assert_eq!(resolved.settings.duration, 1.0);
+        assert_eq!(
+            resolved
+                .definitions
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["custom"]
+        );
     }
 
     fn snow_random_registry(trail: &str) -> String {
