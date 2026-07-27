@@ -3,6 +3,7 @@
 #
 # Yazelix consumers can place this same TOML contract in their own config root
 # Cursor selection, effects, duration, glow, and cursor definitions live here
+# Removing a finite setting inherits its value from this packaged template
 #
 # enabled_cursors is the source of truth for what can be selected
 # Comment out names to disable cursors, reorder names to influence

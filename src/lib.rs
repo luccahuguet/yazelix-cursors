@@ -576,7 +576,7 @@ struct RawCursorDefinition {
 
 impl CursorRegistry {
     pub fn parse_str(path: &Path, raw: &str) -> Result<Self, CursorError> {
-        let parsed = toml::from_str::<RawCursorRegistry>(raw).map_err(|source| {
+        let invalid_toml = |source| {
             CursorError::toml(
                 "invalid_cursor_config_toml",
                 "Could not parse Yazelix cursor config",
@@ -584,7 +584,17 @@ impl CursorRegistry {
                 path.to_string_lossy(),
                 source,
             )
-        })?;
+        };
+        let mut value = toml::from_str::<toml::Value>(raw).map_err(&invalid_toml)?;
+        let defaults = toml::from_str(DEFAULT_CURSOR_CONFIG_TEMPLATE)
+            .expect("packaged cursor config must be valid TOML");
+        for spec in cursor_config_field_specs()
+            .iter()
+            .filter(|spec| spec.kind.is_writable())
+        {
+            inherit_missing_toml_value(&mut value, &defaults, spec.path);
+        }
+        let parsed = value.try_into().map_err(invalid_toml)?;
         CursorRegistry::from_raw(path, parsed)
     }
 
@@ -743,6 +753,37 @@ impl CursorRegistry {
             definitions,
         })
     }
+}
+
+fn inherit_missing_toml_value(active: &mut toml::Value, defaults: &toml::Value, path: &str) {
+    if toml_value_at_path(active, path).is_some() {
+        return;
+    }
+    let Some(default) = toml_value_at_path(defaults, path).cloned() else {
+        return;
+    };
+    let mut segments = path.split('.').peekable();
+    let Some(mut table) = active.as_table_mut() else {
+        return;
+    };
+    while let Some(segment) = segments.next() {
+        if segments.peek().is_none() {
+            table.insert(segment.to_string(), default);
+            return;
+        }
+        let entry = table
+            .entry(segment)
+            .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+        let Some(next) = entry.as_table_mut() else {
+            return;
+        };
+        table = next;
+    }
+}
+
+fn toml_value_at_path<'a>(value: &'a toml::Value, path: &str) -> Option<&'a toml::Value> {
+    path.split('.')
+        .try_fold(value, |current, segment| current.get(segment))
 }
 
 impl CursorDefinition {
@@ -1743,6 +1784,27 @@ color = "#ffb929"
         assert_eq!(values, SUPPORTED_TRAIL_EFFECTS);
         assert_eq!(extra_values, ["random", "none"]);
         assert_eq!(registry.schema_version, CURSOR_CONFIG_SCHEMA_VERSION);
+    }
+
+    // Defends: finite settings can express sparse intent while packaged definitions remain exact.
+    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
+    #[test]
+    fn omitted_finite_settings_resolve_from_the_packaged_template() {
+        let (_, definitions) = DEFAULT_CURSOR_CONFIG_TEMPLATE
+            .split_once("[[cursor]]\nname")
+            .expect("packaged cursor definitions");
+        let sparse = format!(
+            "schema_version = {CURSOR_CONFIG_SCHEMA_VERSION}\n\n[[cursor]]\nname{definitions}"
+        );
+
+        let resolved = CursorRegistry::parse_str(Path::new("sparse.toml"), &sparse).unwrap();
+        let packaged = CursorRegistry::parse_str(
+            Path::new("yazelix_cursors_default.toml"),
+            DEFAULT_CURSOR_CONFIG_TEMPLATE,
+        )
+        .unwrap();
+
+        assert_eq!(resolved, packaged);
     }
 
     fn snow_random_registry(trail: &str) -> String {
