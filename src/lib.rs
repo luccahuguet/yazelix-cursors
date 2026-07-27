@@ -59,7 +59,13 @@ pub enum CursorConfigFieldKind {
 
 impl CursorConfigFieldKind {
     pub fn is_writable(self) -> bool {
-        !matches!(self, Self::FixedInteger(_) | Self::DefinitionTables)
+        matches!(
+            self,
+            Self::DefinitionList
+                | Self::DefinitionChoice { .. }
+                | Self::StringChoice { .. }
+                | Self::NumberRange { .. }
+        )
     }
 }
 
@@ -1737,6 +1743,10 @@ color = "#ffb929"
         assert_eq!(values, SUPPORTED_TRAIL_EFFECTS);
         assert_eq!(extra_values, ["random", "none"]);
         assert_eq!(registry.schema_version, CURSOR_CONFIG_SCHEMA_VERSION);
+        assert_eq!(
+            specs.iter().filter(|spec| spec.kind.is_writable()).count(),
+            6
+        );
     }
 
     fn snow_random_registry(trail: &str) -> String {
