@@ -116,9 +116,13 @@ The repository is named `yazelix-cursors` because the cursor registry and shader
 
 ## Boundary With Yazelix
 
-`yazelix_cursors` owns reusable cursor registry validation, Ghostty-compatible shader generation, packaged assets, and the standalone `yzc` command
+`yazelix_cursors` owns reusable cursor registry validation, Ghostty-compatible
+shader generation, packaged assets, and the standalone `yzc` command.
+`cursor_config_field_specs()` exposes the same child-owned setting and dynamic
+definition inventory to configuration UIs.
 
-Yazelix consumes this crate for integrated cursor config, the config UI cursor tab, terminal materialization, and `yzx cursors`
+Yazelix consumes this crate for integrated cursor config, the config UI cursor
+tab, terminal materialization, and `yzx cursors`.
 
 The crate must not depend on:
 

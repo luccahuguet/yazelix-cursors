@@ -15,6 +15,7 @@ pub const DEFAULT_CURSOR_CONFIG_FILENAME: &str = "yazelix_cursors_default.toml";
 pub const DEFAULT_CURSOR_CONFIG_TEMPLATE: &str = include_str!("../yazelix_cursors_default.toml");
 pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
 pub const STANDALONE_CURSOR_CONFIG_FILENAME: &str = "cursors.toml";
+pub const CURSOR_CONFIG_SCHEMA_VERSION: u32 = 1;
 pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
 pub const GHOSTTY_TRAIL_DURATION_MAX: f64 = 4.0;
@@ -23,6 +24,7 @@ pub const SUPPORTED_TRAIL_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
 pub const SUPPORTED_MODE_EFFECTS: &[&str] =
     &["ripple", "sonic_boom", "rectangle_boom", "ripple_rectangle"];
 pub const SUPPORTED_GLOW_LEVELS: &[&str] = &["none", "low", "medium", "high"];
+const RANDOM_OR_NONE: &[&str] = &["random", "none"];
 const LIGHT_RANDOM_EXCLUDED_CURSOR_NAMES: &[&str] = &["snow"];
 const REMOVED_CURSOR_NAMES: &[&str] = &["party", RETIRED_CURSOR_NAME];
 const RETIRED_CURSOR_NAME: &str = "neon";
@@ -36,6 +38,107 @@ const GHOSTTY_CURSOR_EFFECT_TEMPLATES: &[(&str, &str)] = &[
     ("ripple_rectangle", "ripple_rectangle_cursor.glsl"),
 ];
 const GHOSTTY_CURSOR_MOVEMENT_EFFECTS: &[&str] = &["tail", "warp", "sweep"];
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CursorConfigFieldKind {
+    FixedInteger(u32),
+    DefinitionList,
+    DefinitionChoice {
+        extra_values: &'static [&'static str],
+    },
+    StringChoice {
+        values: &'static [&'static str],
+        extra_values: &'static [&'static str],
+    },
+    NumberRange {
+        min: f64,
+        max: f64,
+    },
+    DefinitionTables,
+}
+
+impl CursorConfigFieldKind {
+    pub fn is_writable(self) -> bool {
+        !matches!(self, Self::FixedInteger(_) | Self::DefinitionTables)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CursorConfigFieldSpec {
+    pub path: &'static str,
+    pub description: &'static str,
+    pub validation: &'static str,
+    pub kind: CursorConfigFieldKind,
+}
+
+const CURSOR_CONFIG_FIELD_SPECS: &[CursorConfigFieldSpec] = &[
+    CursorConfigFieldSpec {
+        path: "schema_version",
+        description: "Cursor configuration format version.",
+        validation: "child-owned cursor schema version",
+        kind: CursorConfigFieldKind::FixedInteger(CURSOR_CONFIG_SCHEMA_VERSION),
+    },
+    CursorConfigFieldSpec {
+        path: "enabled_cursors",
+        description: "Cursor definitions available to fixed and random selection.",
+        validation: "one or more unique names defined by cursor tables",
+        kind: CursorConfigFieldKind::DefinitionList,
+    },
+    CursorConfigFieldSpec {
+        path: "settings.trail",
+        description: "Cursor palette selection.",
+        validation: "enabled cursor name, random, or none",
+        kind: CursorConfigFieldKind::DefinitionChoice {
+            extra_values: RANDOM_OR_NONE,
+        },
+    },
+    CursorConfigFieldSpec {
+        path: "settings.trail_effect",
+        description: "Cursor movement effect for compatible consumers.",
+        validation: "supported trail effect, random, or none",
+        kind: CursorConfigFieldKind::StringChoice {
+            values: SUPPORTED_TRAIL_EFFECTS,
+            extra_values: RANDOM_OR_NONE,
+        },
+    },
+    CursorConfigFieldSpec {
+        path: "settings.mode_effect",
+        description: "Cursor mode-change effect for compatible consumers.",
+        validation: "supported mode effect, random, or none",
+        kind: CursorConfigFieldKind::StringChoice {
+            values: SUPPORTED_MODE_EFFECTS,
+            extra_values: RANDOM_OR_NONE,
+        },
+    },
+    CursorConfigFieldSpec {
+        path: "settings.glow",
+        description: "Cursor effect glow for compatible consumers.",
+        validation: "supported glow level",
+        kind: CursorConfigFieldKind::StringChoice {
+            values: SUPPORTED_GLOW_LEVELS,
+            extra_values: &[],
+        },
+    },
+    CursorConfigFieldSpec {
+        path: "settings.duration",
+        description: "Cursor movement duration multiplier for compatible consumers.",
+        validation: "number from 0.25 to 4.0",
+        kind: CursorConfigFieldKind::NumberRange {
+            min: GHOSTTY_TRAIL_DURATION_MIN,
+            max: GHOSTTY_TRAIL_DURATION_MAX,
+        },
+    },
+    CursorConfigFieldSpec {
+        path: "cursor",
+        description: "Named cursor palette and transition definitions.",
+        validation: "child-owned cursor definition tables",
+        kind: CursorConfigFieldKind::DefinitionTables,
+    },
+];
+
+pub fn cursor_config_field_specs() -> &'static [CursorConfigFieldSpec] {
+    CURSOR_CONFIG_FIELD_SPECS
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct CursorTargetContract {
@@ -567,13 +670,13 @@ impl CursorRegistry {
     }
 
     fn from_raw(path: &Path, raw: RawCursorRegistry) -> Result<Self, CursorError> {
-        if raw.schema_version != 1 {
+        if raw.schema_version != CURSOR_CONFIG_SCHEMA_VERSION {
             return Err(invalid_cursor_config(
                 path,
                 "schema_version",
                 format!(
-                    "Unsupported cursor config schema_version {}. Expected 1.",
-                    raw.schema_version
+                    "Unsupported cursor config schema_version {}. Expected {}.",
+                    raw.schema_version, CURSOR_CONFIG_SCHEMA_VERSION
                 ),
             ));
         }
@@ -1582,6 +1685,58 @@ color = "#ffb929"
 {extra}
 "##
         )
+    }
+
+    // Defends: consumers can discover every finite cursor setting and the dynamic definition
+    // collection from the child owner instead of maintaining a second schema.
+    // Strength: defect=3 behavior=3 resilience=2 cost=1 uniqueness=1 total=10/10
+    #[test]
+    fn cursor_config_field_specs_cover_registry_settings_and_dynamic_definitions() {
+        let registry =
+            CursorRegistry::parse_str(Path::new("cursors.toml"), &base_registry("")).unwrap();
+        let registry_json = serde_json::to_value(&registry).unwrap();
+        let mut serialized_paths =
+            vec!["schema_version".to_string(), "enabled_cursors".to_string()];
+        serialized_paths.extend(
+            registry_json["settings"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(|key| format!("settings.{key}")),
+        );
+        serialized_paths.sort();
+
+        let specs = cursor_config_field_specs();
+        let mut finite_paths = specs
+            .iter()
+            .filter(|spec| !matches!(spec.kind, CursorConfigFieldKind::DefinitionTables))
+            .map(|spec| spec.path.to_string())
+            .collect::<Vec<_>>();
+        finite_paths.sort();
+
+        assert_eq!(finite_paths, serialized_paths);
+        assert!(matches!(
+            specs
+                .iter()
+                .find(|spec| spec.path == "cursor")
+                .unwrap()
+                .kind,
+            CursorConfigFieldKind::DefinitionTables
+        ));
+        let trail_effect = specs
+            .iter()
+            .find(|spec| spec.path == "settings.trail_effect")
+            .unwrap();
+        let CursorConfigFieldKind::StringChoice {
+            values,
+            extra_values,
+        } = trail_effect.kind
+        else {
+            panic!("trail effect is not a finite string choice");
+        };
+        assert_eq!(values, SUPPORTED_TRAIL_EFFECTS);
+        assert_eq!(extra_values, ["random", "none"]);
+        assert_eq!(registry.schema_version, CURSOR_CONFIG_SCHEMA_VERSION);
     }
 
     fn snow_random_registry(trail: &str) -> String {
