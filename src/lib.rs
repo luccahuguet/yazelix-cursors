@@ -576,6 +576,19 @@ struct RawCursorDefinition {
 
 impl CursorRegistry {
     pub fn parse_str(path: &Path, raw: &str) -> Result<Self, CursorError> {
+        Self::parse_str_with_finite_overrides(path, raw, true)
+    }
+
+    /// Parses a registry while treating every finite override as absent.
+    pub fn parse_without_finite_overrides(path: &Path, raw: &str) -> Result<Self, CursorError> {
+        Self::parse_str_with_finite_overrides(path, raw, false)
+    }
+
+    fn parse_str_with_finite_overrides(
+        path: &Path,
+        raw: &str,
+        keep_finite_overrides: bool,
+    ) -> Result<Self, CursorError> {
         let invalid_toml = |source| {
             CursorError::toml(
                 "invalid_cursor_config_toml",
@@ -592,6 +605,9 @@ impl CursorRegistry {
             .iter()
             .filter(|spec| spec.kind.is_writable())
         {
+            if !keep_finite_overrides {
+                remove_finite_setting(&mut value, spec.path);
+            }
             inherit_missing_finite_setting(&mut value, &defaults, spec.path);
         }
         let parsed = value.try_into().map_err(invalid_toml)?;
@@ -752,6 +768,21 @@ impl CursorRegistry {
             settings,
             definitions,
         })
+    }
+}
+
+fn remove_finite_setting(active: &mut toml::Value, path: &str) {
+    let Some(active) = active.as_table_mut() else {
+        return;
+    };
+    let Some((section, key)) = path.split_once('.') else {
+        active.remove(path);
+        return;
+    };
+    if !key.contains('.')
+        && let Some(section) = active.get_mut(section).and_then(toml::Value::as_table_mut)
+    {
+        section.remove(key);
     }
 }
 
@@ -1843,6 +1874,31 @@ color = "#123456"
                 .collect::<Vec<_>>(),
             ["custom"]
         );
+
+        let inline = r##"
+schema_version = 1
+enabled_cursors = ["first"]
+settings = { trail = "first", trail_effect = "tail", mode_effect = "none", glow = "high", duration = 2.0 }
+
+[[cursor]]
+name = "first"
+family = "mono"
+color = "#123456"
+
+[[cursor]]
+name = "second"
+family = "mono"
+color = "#654321"
+"##;
+        let inherited =
+            CursorRegistry::parse_without_finite_overrides(Path::new("inline.toml"), inline)
+                .unwrap();
+        assert_eq!(inherited.enabled_cursors, ["first", "second"]);
+        assert_eq!(inherited.settings.trail, "random");
+        assert_eq!(inherited.settings.trail_effect, "random");
+        assert_eq!(inherited.settings.mode_effect, "random");
+        assert_eq!(inherited.settings.glow, "medium");
+        assert_eq!(inherited.settings.duration, 1.0);
 
         let error =
             CursorRegistry::parse_str(Path::new("future.toml"), "schema_version = 2").unwrap_err();
