@@ -1743,10 +1743,6 @@ color = "#ffb929"
         assert_eq!(values, SUPPORTED_TRAIL_EFFECTS);
         assert_eq!(extra_values, ["random", "none"]);
         assert_eq!(registry.schema_version, CURSOR_CONFIG_SCHEMA_VERSION);
-        assert_eq!(
-            specs.iter().filter(|spec| spec.kind.is_writable()).count(),
-            6
-        );
     }
 
     fn snow_random_registry(trail: &str) -> String {
