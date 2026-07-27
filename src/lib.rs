@@ -605,10 +605,7 @@ impl CursorRegistry {
             .iter()
             .filter(|spec| spec.kind.is_writable())
         {
-            if !keep_finite_overrides {
-                remove_finite_setting(&mut value, spec.path);
-            }
-            inherit_missing_finite_setting(&mut value, &defaults, spec.path);
+            resolve_setting(&mut value, &defaults, spec.path, keep_finite_overrides);
         }
         let parsed = value.try_into().map_err(invalid_toml)?;
         CursorRegistry::from_raw(path, parsed)
@@ -771,27 +768,17 @@ impl CursorRegistry {
     }
 }
 
-fn remove_finite_setting(active: &mut toml::Value, path: &str) {
-    let Some(active) = active.as_table_mut() else {
-        return;
-    };
-    let Some((section, key)) = path.split_once('.') else {
-        active.remove(path);
-        return;
-    };
-    if !key.contains('.')
-        && let Some(section) = active.get_mut(section).and_then(toml::Value::as_table_mut)
-    {
-        section.remove(key);
-    }
-}
-
-fn inherit_missing_finite_setting(active: &mut toml::Value, defaults: &toml::Value, path: &str) {
+fn resolve_setting(
+    active: &mut toml::Value,
+    defaults: &toml::Value,
+    path: &str,
+    keep_override: bool,
+) {
     let (Some(active), Some(defaults)) = (active.as_table_mut(), defaults.as_table()) else {
         return;
     };
     let Some((section, key)) = path.split_once('.') else {
-        if active.contains_key(path) {
+        if keep_override && active.contains_key(path) {
             return;
         }
         let default = if path == "enabled_cursors" {
@@ -827,7 +814,11 @@ fn inherit_missing_finite_setting(active: &mut toml::Value, defaults: &toml::Val
         .entry(section)
         .or_insert_with(|| toml::Value::Table(toml::Table::new()));
     if let Some(section) = section.as_table_mut() {
-        section.entry(key).or_insert(default);
+        if keep_override {
+            section.entry(key).or_insert(default);
+        } else {
+            section.insert(key.to_string(), default);
+        }
     }
 }
 
