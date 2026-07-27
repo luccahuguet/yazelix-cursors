@@ -764,17 +764,15 @@ fn inherit_missing_finite_setting(active: &mut toml::Value, defaults: &toml::Val
             return;
         }
         let default = if path == "enabled_cursors" {
-            active
-                .get("cursor")
-                .and_then(toml::Value::as_array)
-                .map(|definitions| {
-                    toml::Value::Array(
-                        definitions
-                            .iter()
-                            .filter_map(|definition| definition.get("name").cloned())
-                            .collect(),
-                    )
-                })
+            Some(toml::Value::Array(
+                active
+                    .get("cursor")
+                    .and_then(toml::Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|definition| definition.get("name").cloned())
+                    .collect(),
+            ))
         } else {
             defaults.get(path).cloned()
         };
@@ -1845,6 +1843,10 @@ color = "#123456"
                 .collect::<Vec<_>>(),
             ["custom"]
         );
+
+        let error =
+            CursorRegistry::parse_str(Path::new("future.toml"), "schema_version = 2").unwrap_err();
+        assert!(error.to_string().contains("schema_version"));
     }
 
     fn snow_random_registry(trail: &str) -> String {
