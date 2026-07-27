@@ -592,7 +592,7 @@ impl CursorRegistry {
             .iter()
             .filter(|spec| spec.kind.is_writable())
         {
-            inherit_missing_toml_value(&mut value, &defaults, spec.path);
+            inherit_missing_finite_setting(&mut value, &defaults, spec.path);
         }
         let parsed = value.try_into().map_err(invalid_toml)?;
         CursorRegistry::from_raw(path, parsed)
@@ -755,35 +755,35 @@ impl CursorRegistry {
     }
 }
 
-fn inherit_missing_toml_value(active: &mut toml::Value, defaults: &toml::Value, path: &str) {
-    if toml_value_at_path(active, path).is_some() {
-        return;
-    }
-    let Some(default) = toml_value_at_path(defaults, path).cloned() else {
+fn inherit_missing_finite_setting(active: &mut toml::Value, defaults: &toml::Value, path: &str) {
+    let (Some(active), Some(defaults)) = (active.as_table_mut(), defaults.as_table()) else {
         return;
     };
-    let mut segments = path.split('.').peekable();
-    let Some(mut table) = active.as_table_mut() else {
-        return;
-    };
-    while let Some(segment) = segments.next() {
-        if segments.peek().is_none() {
-            table.insert(segment.to_string(), default);
-            return;
+    let Some((section, key)) = path.split_once('.') else {
+        if !active.contains_key(path)
+            && let Some(default) = defaults.get(path)
+        {
+            active.insert(path.to_string(), default.clone());
         }
-        let entry = table
-            .entry(segment)
-            .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-        let Some(next) = entry.as_table_mut() else {
-            return;
-        };
-        table = next;
+        return;
+    };
+    if key.contains('.') {
+        return;
     }
-}
-
-fn toml_value_at_path<'a>(value: &'a toml::Value, path: &str) -> Option<&'a toml::Value> {
-    path.split('.')
-        .try_fold(value, |current, segment| current.get(segment))
+    let Some(default) = defaults
+        .get(section)
+        .and_then(toml::Value::as_table)
+        .and_then(|table| table.get(key))
+        .cloned()
+    else {
+        return;
+    };
+    let section = active
+        .entry(section)
+        .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+    if let Some(section) = section.as_table_mut() {
+        section.entry(key).or_insert(default);
+    }
 }
 
 impl CursorDefinition {
