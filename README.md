@@ -5,8 +5,8 @@ Standalone Yazelix cursor presets and terminal shader outputs
 The user-facing command is `yzc`
 
 ```bash
-nix run github:luccahuguet/yazelix-cursors#yzc -- --help
-nix profile install github:luccahuguet/yazelix-cursors#yazelix_cursors
+nix run github:Yazelix/cursors#yzc -- --help
+nix profile install github:Yazelix/cursors#yazelix_cursors
 ```
 
 ## What It Contains

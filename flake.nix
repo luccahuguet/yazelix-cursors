@@ -162,7 +162,7 @@ EOF
 
           meta = {
             description = "Standalone Yazelix cursor presets and terminal shader outputs";
-            homepage = "https://github.com/luccahuguet/yazelix-cursors";
+            homepage = "https://github.com/Yazelix/cursors";
             license = pkgs.lib.licenses.asl20;
             mainProgram = "yzc";
           };
