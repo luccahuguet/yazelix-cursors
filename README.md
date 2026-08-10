@@ -117,7 +117,9 @@ Effects are global per generated Ghostty include. Ghostty does not support per-c
 
 ## Compatibility
 
-The repository is named `yazelix-cursors` because the cursor registry and shader assets are shared by Yazelix terminals, including Yazelix Terminal. The old `yazelix-ghostty-cursors` package/config names are not exposed as compatibility aliases.
+The product is named Yazelix Cursors. Its canonical repository is
+`Yazelix/cursors`. The old `yazelix-ghostty-cursors` package/config names are
+not exposed as compatibility aliases.
 
 ## Boundary With Yazelix
 
@@ -138,7 +140,8 @@ The crate must not depend on:
 
 ## Surfaces
 
-- Product/repository: `yazelix-cursors`
+- Product: Yazelix Cursors
+- Repository: `Yazelix/cursors`
 - Command: `yzc`
 - Rust crate: `yazelix_cursors`
 - Nix output: `yazelix_cursors`
