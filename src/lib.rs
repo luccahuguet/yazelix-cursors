@@ -16,6 +16,7 @@ pub const DEFAULT_CURSOR_CONFIG_TEMPLATE: &str = include_str!("../yazelix_cursor
 pub const STANDALONE_CURSOR_CONFIG_DIR_NAME: &str = "yazelix_cursors";
 pub const STANDALONE_CURSOR_CONFIG_FILENAME: &str = "cursors.toml";
 pub const CURSOR_CONFIG_SCHEMA_VERSION: u32 = 1;
+const EON_VENUS_NATIVE_TARGET: &str = "eon-venus-native-v1";
 pub const DEFAULT_GHOSTTY_TRAIL_DURATION: f64 = 1.0;
 pub const GHOSTTY_TRAIL_DURATION_MIN: f64 = 0.25;
 pub const GHOSTTY_TRAIL_DURATION_MAX: f64 = 4.0;
@@ -204,6 +205,15 @@ const CURSOR_TARGET_CONTRACTS: &[CursorTargetContract] = &[
             "native_cursor_visibility_control",
         ],
         notes: &["Rio-compatible consumers provide the terminal-side uniform ABI."],
+    },
+    CursorTargetContract {
+        name: EON_VENUS_NATIVE_TARGET,
+        status: "supported",
+        emits: &["typed_single_color_cursor"],
+        requires: &["native_cursor_tail"],
+        notes: &[
+            "Returns tail or none, the first resolved palette color, and the duration multiplier; emits no shaders or split metadata.",
+        ],
     },
     CursorTargetContract {
         name: "ratty",
@@ -529,6 +539,13 @@ pub struct CursorColor {
     pub hex: String,
 }
 
+/// Native cursor presentation for the Eon Venus v1 target.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EonVenusNativeCursorV1 {
+    None,
+    Tail { color: CursorColor, duration: f64 },
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct ResolvedCursorRegistryState {
     pub selected_cursor: Option<CursorDefinition>,
@@ -630,6 +647,46 @@ impl CursorRegistry {
 
     pub fn resolve_with_entropy(&self, entropy: usize) -> ResolvedCursorRegistryState {
         self.resolve_with_entropy_for_appearance(entropy, "dark")
+    }
+
+    /// Resolves the current registry to the Eon Venus native v1 target.
+    ///
+    /// `trail_effect = "none"` returns `None`. `tail` and `random` return `Tail`
+    /// when a trail is selected, or `None` when `trail = "none"`. Other movement
+    /// effects return a target-specific config error. Mono and split definitions
+    /// use their first resolved palette color.
+    pub fn resolve_eon_venus_native_v1(&self) -> Result<EonVenusNativeCursorV1, CursorError> {
+        self.resolve_eon_venus_native_v1_with_entropy(timestamp_nanos() as usize)
+    }
+
+    fn resolve_eon_venus_native_v1_with_entropy(
+        &self,
+        entropy: usize,
+    ) -> Result<EonVenusNativeCursorV1, CursorError> {
+        match self.settings.trail_effect.as_str() {
+            "none" => return Ok(EonVenusNativeCursorV1::None),
+            "tail" | "random" => {}
+            effect => {
+                return Err(CursorError::classified(
+                    CursorErrorClass::Config,
+                    "unsupported_eon_venus_native_effect",
+                    format!(
+                        "Cursor movement effect '{effect}' is not supported by {EON_VENUS_NATIVE_TARGET}."
+                    ),
+                    "Use tail, random, or none for the Eon Venus native target.",
+                    json!({ "effect": effect, "target": EON_VENUS_NATIVE_TARGET }),
+                ));
+            }
+        }
+
+        let resolved = self.resolve_with_entropy(entropy);
+        let Some(cursor) = resolved.selected_cursor else {
+            return Ok(EonVenusNativeCursorV1::None);
+        };
+        Ok(EonVenusNativeCursorV1::Tail {
+            color: cursor.colors[0].clone(),
+            duration: resolved.duration,
+        })
     }
 
     pub fn resolve_for_appearance(&self, appearance_mode: &str) -> ResolvedCursorRegistryState {
@@ -1938,6 +1995,7 @@ color = "#ffb929"
                 "rio-compatible-config",
                 "mars",
                 "rio",
+                "eon-venus-native-v1",
                 "ratty",
                 "protocol_cursor_positions"
             ]
@@ -1964,6 +2022,81 @@ color = "#ffb929"
                 .requires
                 .contains(&"terminal_multiple_cursor_protocol")
         );
+    }
+
+    #[test]
+    fn eon_venus_native_v1_is_a_single_color_target() {
+        let target = cursor_target_contract("eon-venus-native-v1").unwrap();
+        assert_eq!(target.status, "supported");
+        assert_eq!(target.emits, ["typed_single_color_cursor"]);
+        assert_eq!(target.requires, ["native_cursor_tail"]);
+        assert!(target.notes[0].contains("first resolved palette color"));
+        let tail = |hex: &str, duration| EonVenusNativeCursorV1::Tail {
+            color: CursorColor { hex: hex.into() },
+            duration,
+        };
+
+        let registry = CursorRegistry::parse_str(
+            Path::new("yazelix_cursors_default.toml"),
+            DEFAULT_CURSOR_CONFIG_TEMPLATE,
+        )
+        .unwrap();
+        assert_eq!(
+            registry
+                .resolve_eon_venus_native_v1_with_entropy(0)
+                .unwrap(),
+            tail("#ffb929", 1.0)
+        );
+        assert_eq!(
+            registry
+                .resolve_eon_venus_native_v1_with_entropy(8)
+                .unwrap(),
+            tail("#2e294e", 1.0)
+        );
+
+        let mono_override = CursorRegistry::parse_str(
+            Path::new("mono.toml"),
+            &base_registry(
+                r##"
+accent_color = "#ff0000"
+cursor_color = "#00ff66"
+"##,
+            )
+            .replace("trail_effect = \"random\"", "trail_effect = \"tail\"")
+            .replace("duration = 1.0", "duration = 2.5"),
+        )
+        .unwrap();
+        assert_eq!(
+            mono_override
+                .resolve_eon_venus_native_v1_with_entropy(1)
+                .unwrap(),
+            tail("#ffb929", 2.5)
+        );
+
+        for disabled in [
+            base_registry("").replace("trail = \"random\"", "trail = \"none\""),
+            base_registry("").replace("trail_effect = \"random\"", "trail_effect = \"none\""),
+        ] {
+            let registry = CursorRegistry::parse_str(Path::new("none.toml"), &disabled).unwrap();
+            assert_eq!(
+                registry
+                    .resolve_eon_venus_native_v1_with_entropy(0)
+                    .unwrap(),
+                EonVenusNativeCursorV1::None
+            );
+        }
+
+        for effect in ["warp", "sweep"] {
+            let raw = base_registry("").replace(
+                "trail_effect = \"random\"",
+                &format!("trail_effect = \"{effect}\""),
+            );
+            let registry = CursorRegistry::parse_str(Path::new("unsupported.toml"), &raw).unwrap();
+            let error = registry
+                .resolve_eon_venus_native_v1_with_entropy(0)
+                .unwrap_err();
+            assert_eq!(error.code(), "unsupported_eon_venus_native_effect");
+        }
     }
 
     // Defends: the shipped cursor registry can resolve a one-item enabled list and random only draws from that list.

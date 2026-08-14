@@ -15,7 +15,7 @@ nix profile install github:Yazelix/cursors#yazelix_cursors
 - Data-driven cursor palette generation
 - Ghostty-compatible cursor effect shader generation
 - Packaged shader assets and generated shader examples
-- Terminal target contracts for Ghostty, mars, Rio, Ratty, and protocol cursor positions
+- Terminal target contracts for Ghostty, Eon Venus, mars, Rio, Ratty, and protocol cursor positions
 - A standalone `yzc` binary
 
 ## Standalone Ghostty-Compatible Usage
@@ -112,6 +112,12 @@ Effects are global per generated Ghostty include. Ghostty does not support per-c
   for Rio and Rio-derived terminals
 - `mars` consumes the Ghostty-compatible shader files with the Rio trail uniform ABI
 - `rio` documents the Rio-compatible shader ABI surface
+- `eon-venus-native-v1` exposes `CursorRegistry::resolve_eon_venus_native_v1`,
+  which returns `tail` or `none`, the first resolved palette color, and the
+  duration multiplier. Yazelix Cursors owns registry resolution and projection.
+  The v1 output contains no family, accent, secondary color, divider, transition,
+  cursor-color override, mode effect, glow, or shader data. It leaves Orbit's
+  cursor color unchanged
 - `ratty` has an explicit experimental no-op target slot
 - `protocol_cursor_positions` documents protocol-backed multi-cursor output as separate from GLSL shaders
 
